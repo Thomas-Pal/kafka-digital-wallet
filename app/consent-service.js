@@ -20,6 +20,30 @@ const pendingRequests = [];
 const decisions = [];
 const auditTrail = [];
 
+const demoRequests = [
+  {
+    correlationId: 'req-1001',
+    requestingSystem: 'DWP-benefits-gateway',
+    purpose: 'benefit-eligibility-check',
+    patientId: 'nhs-999',
+    retention: '6 months'
+  },
+  {
+    correlationId: 'req-1002',
+    requestingSystem: 'DWP-risk-analytics',
+    purpose: 'fraud-prevention',
+    patientId: 'nhs-123',
+    retention: '3 months'
+  },
+  {
+    correlationId: 'req-1003',
+    requestingSystem: 'DWP-risk-analytics',
+    purpose: 'fraud-prevention',
+    patientId: 'nhs-777',
+    retention: '3 months'
+  }
+];
+
 const upsertRequest = (request) => {
   if (!request?.correlationId) return;
 
@@ -213,6 +237,15 @@ const renderDashboard = () => `
           '</tr>'
         ].join('');
 
+      document.getElementById('inject-demo').addEventListener('click', async () => {
+        try {
+          await fetch('/api/demo/requests', { method: 'POST' });
+          await refresh();
+        } catch (err) {
+          console.error('Failed to seed demo requests', err);
+        }
+      });
+
       const sendDecision = async (correlationId, decision) => {
         try {
           await fetch('/api/decisions', {
@@ -383,6 +416,39 @@ const startService = async () => {
     console.log('✅ user decision captured', decisionRecord.patientId, decisionRecord.decision);
     res.json(decisionRecord);
   });
+
+  const seedDemo = async () => {
+    const now = Date.now();
+    const entries = demoRequests.map((req, idx) => ({
+      ...req,
+      correlationId: `${req.correlationId}-${now}-${idx}`,
+      requestedAt: new Date().toISOString()
+    }));
+
+    for (const entry of entries) {
+      upsertRequest(entry);
+    }
+
+    if (kafkaReady) {
+      try {
+        await producer.send({
+          topic: 'dwp.consent.requests',
+          messages: entries.map((req) => ({ key: req.patientId, value: JSON.stringify(req) }))
+        });
+        console.log('🧪 seeded demo consent requests into Kafka');
+      } catch (err) {
+        console.error('Failed to seed demo requests into Kafka', err);
+      }
+    } else {
+      console.log('🧪 demo requests added locally (Kafka not connected yet)');
+    }
+  };
+
+  app.post('/api/demo/requests', async (_req, res) => {
+    await seedDemo();
+    res.json({ status: 'ok', count: pendingRequests.length });
+  });
+
   app.get('/', (_req, res) => res.send(renderDashboard()));
 
   const port = process.env.PORT || 3000;
