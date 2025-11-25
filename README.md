@@ -1,6 +1,6 @@
 # Kafka NHS PoC
 
-Quick start for the local NHS prescription → Kafka demo, now with DWP consent requests and an embedded consent UI. The consent service represents the UK digital wallet (mobile in reality; web UI placeholder here). For full details see [app/README.md](app/README.md). Host clients should connect to Kafka at **127.0.0.1:29092**.
+Quick start for the local NHS prescription → Kafka demo, now with DWP consent requests and an embedded consent UI. For full details see [app/README.md](app/README.md). Host clients should connect to Kafka at **127.0.0.1:29092**.
 
 ## Usage
 ```bash
@@ -18,5 +18,5 @@ npm run produce:dwp        # terminal D triggers consent flow
 Or run the whole sequence (infra, topics, install, dashboard, consumer, producers) with a single helper:
 ```bash
 bash scripts/start-flow.sh
-# consent UI at the first free port from 3000 (set CONSENT_PORT to override), Kafka UI at http://localhost:8080
+# consent UI at http://localhost:3000, Kafka UI at http://localhost:8080
 ```

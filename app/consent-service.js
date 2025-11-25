@@ -124,21 +124,6 @@ const renderDashboard = () => `
   </body>
 </html>`;
 
-const startHttpServer = (app, port) =>
-  new Promise((resolve, reject) => {
-    const server = app.listen(port, () => {
-      console.log(`Consent service listening on http://localhost:${port}`);
-      resolve(server);
-    });
-
-    server.on('error', (err) => {
-      if (err.code === 'EADDRINUSE') {
-        console.error(`Port ${port} is busy. Set PORT to a free port, e.g. PORT=${port + 1}`);
-      }
-      reject(err);
-    });
-  });
-
 const startService = async () => {
   await producer.connect();
   await consumer.connect();
@@ -152,40 +137,40 @@ const startService = async () => {
   app.get('/api/audit', (_req, res) => res.json(auditTrail));
   app.get('/', (_req, res) => res.send(renderDashboard()));
 
-  const port = Number(process.env.PORT || 3000);
-  await startHttpServer(app, port);
+  const port = process.env.PORT || 3000;
+  app.listen(port, () => {
+    console.log(`Consent service listening on http://localhost:${port}`);
+  });
 
-  consumer
-    .run({
-      eachMessage: async ({ message }) => {
-        const raw = message.value?.toString() || '{}';
-        const request = JSON.parse(raw);
-        const decision = decide(request);
+  consumer.run({
+    eachMessage: async ({ message }) => {
+      const raw = message.value?.toString() || '{}';
+      const request = JSON.parse(raw);
+      const decision = decide(request);
 
-        decisions.unshift(decision);
-        if (decisions.length > 50) decisions.pop();
+      decisions.unshift(decision);
+      if (decisions.length > 50) decisions.pop();
 
-        const auditEvent = recordAudit(decision);
-        auditTrail.unshift(auditEvent);
-        if (auditTrail.length > 100) auditTrail.pop();
+      const auditEvent = recordAudit(decision);
+      auditTrail.unshift(auditEvent);
+      if (auditTrail.length > 100) auditTrail.pop();
 
-        await producer.send({
-          topic: 'nhs.consent.decisions',
-          messages: [{ key: decision.patientId, value: JSON.stringify(decision) }]
-        });
+      await producer.send({
+        topic: 'nhs.consent.decisions',
+        messages: [{ key: decision.patientId, value: JSON.stringify(decision) }]
+      });
 
-        await producer.send({
-          topic: 'nhs.audit.events',
-          messages: [{ key: decision.patientId, value: JSON.stringify(auditEvent) }]
-        });
+      await producer.send({
+        topic: 'nhs.audit.events',
+        messages: [{ key: decision.patientId, value: JSON.stringify(auditEvent) }]
+      });
 
-        console.log('✅ consent decision', decision.patientId, decision.decision);
-      }
-    })
-    .catch((err) => {
-      console.error('Consent consumer failed', err);
-      process.exit(1);
-    });
+      console.log('✅ consent decision', decision.patientId, decision.decision);
+    }
+  }).catch((err) => {
+    console.error('Consent consumer failed', err);
+    process.exit(1);
+  });
 };
 
 startService().catch((err) => {

@@ -2,12 +2,6 @@
 
 A slightly richer corporate PoC showing NHS prescription flows, DWP consent requests, and a simple consent management UI built on Kafka.
 
-### Scenario (UK digital wallet placeholder)
-- The consent service models the UK digital wallet (mobile-first, web UI for this PoC).
-- A patient attends a GP appointment and their NHS prescription changes (RAW + ENRICHED events).
-- The patient then starts a benefits change with DWP. DWP sends a consent/access request to view updated prescription data.
-- The consent service evaluates the request, records an audit event, and publishes the decision back to Kafka for downstream systems and UI display.
-
 ## 0) Start infra
 ```bash
 podman-compose up -d
@@ -40,7 +34,7 @@ Emits both `nhs.raw.prescriptions` and `nhs.enriched.prescriptions` events per p
 ## 5) Run consent management service + UI
 ```bash
 npm run consent:service
-# UI/API defaults to http://localhost:3000; set PORT=3001 npm run consent:service to avoid port clashes
+# UI/API at http://localhost:3000
 ```
 Consumes DWP requests, publishes decisions to `nhs.consent.decisions` and audit entries to `nhs.audit.events`. The dashboard
 auto-refreshes every few seconds and shows a waiting state until requests arrive.
@@ -57,7 +51,7 @@ From the repo root:
 ```bash
 bash scripts/start-flow.sh
 ```
-This brings up Kafka, creates topics, installs Node deps, starts the consent dashboard + consumer, and sends sample NHS and DWP events. The script chooses the first free port from 3000 for the consent UI (override with `CONSENT_PORT=3001 bash scripts/start-flow.sh`).
+This brings up Kafka, creates topics, installs Node deps, starts the consent dashboard + consumer, and sends sample NHS and DWP events. Open `http://localhost:3000` to watch the decisions arrive.
 
 ## Expected
 * Producer logs show RAW + ENRICHED prescription events.
