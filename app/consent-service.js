@@ -1,7 +1,8 @@
 import express from 'express';
 import { Kafka, logLevel } from 'kafkajs';
 
-const kafka = new Kafka({ brokers: ['127.0.0.1:29092'], logLevel: logLevel.NOTHING });
+const broker = process.env.KAFKA_BROKER || '127.0.0.1:29092';
+const kafka = new Kafka({ brokers: [broker], logLevel: logLevel.NOTHING });
 const consumer = kafka.consumer({ groupId: 'consent-service' });
 const producer = kafka.producer();
 
@@ -205,6 +206,8 @@ const startService = async () => {
   await consumer.connect();
   await consumer.subscribe({ topic: 'dwp.consent.requests', fromBeginning: true });
 
+  console.log('🔌 connected to Kafka broker', broker);
+
   const app = express();
   app.use(express.json());
 
@@ -248,10 +251,10 @@ const startService = async () => {
   });
   app.get('/', (_req, res) => res.send(renderDashboard()));
 
-  const port = process.env.PORT || 3000;
-  app.listen(port, () => {
-    console.log(`Consent service listening on http://localhost:${port}`);
-  });
+    const requestIndex = pendingRequests.findIndex((r) => r.correlationId === correlationId);
+    if (requestIndex === -1) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
 
   consumer.run({
     eachMessage: async ({ message }) => {
@@ -265,6 +268,31 @@ const startService = async () => {
     console.error('Consent consumer failed', err);
     process.exit(1);
   });
+  app.get('/', (_req, res) => res.send(renderDashboard()));
+
+  const port = process.env.PORT || 3000;
+  app.listen(port, () => {
+    console.log(`Consent service listening on http://localhost:${port}`);
+  });
+
+  consumer
+    .run({
+      eachMessage: async ({ message }) => {
+        try {
+          const raw = message.value?.toString() || '{}';
+          const request = JSON.parse(raw);
+          pendingRequests.unshift(request);
+          if (pendingRequests.length > 50) pendingRequests.pop();
+          console.log('📬 new consent request awaiting user decision', request.correlationId);
+        } catch (err) {
+          console.error('Failed to process consent request message', err);
+        }
+      }
+    })
+    .catch((err) => {
+      console.error('Consent consumer failed', err);
+      process.exit(1);
+    });
 };
 
 startService().catch((err) => {

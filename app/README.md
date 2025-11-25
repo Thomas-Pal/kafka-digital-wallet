@@ -8,6 +8,8 @@ podman-compose up -d
 # UI at http://localhost:8080 (cluster: local)
 ```
 
+> If you run the Node scripts inside a container, set `KAFKA_BROKER=kafka:9092` (or the reachable listener for your broker). The scripts default to `127.0.0.1:29092` for host execution.
+
 ## 1) Create topics
 ```bash
 bash ../scripts/topics-create.sh
