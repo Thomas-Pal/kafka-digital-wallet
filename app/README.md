@@ -46,6 +46,13 @@ npm run produce:dwp
 ```
 This triggers consent decisions and populates the UI/API.
 
+## One-step demo (bootstrap everything)
+From the repo root:
+```bash
+bash scripts/start-flow.sh
+```
+This brings up Kafka, creates topics, installs Node deps, starts the consent dashboard + consumer, and sends sample NHS and DWP events. Open `http://localhost:3000` to watch the decisions arrive.
+
 ## Expected
 * Producer logs show RAW + ENRICHED prescription events.
 * Consent service logs `✅ consent decision ...` for each inbound DWP request.

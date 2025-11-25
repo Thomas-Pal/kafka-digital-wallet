@@ -14,3 +14,9 @@ npm run produce:nhs        # terminal C
 npm run produce:dwp        # terminal D triggers consent flow
 # (Optional UI) open http://localhost:8080 for Kafka UI
 ```
+
+Or run the whole sequence (infra, topics, install, dashboard, consumer, producers) with a single helper:
+```bash
+bash scripts/start-flow.sh
+# consent UI at http://localhost:3000, Kafka UI at http://localhost:8080
+```
