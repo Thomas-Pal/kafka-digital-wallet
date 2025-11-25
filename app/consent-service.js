@@ -251,6 +251,25 @@ const startService = async () => {
   });
   app.get('/', (_req, res) => res.send(renderDashboard()));
 
+    const requestIndex = pendingRequests.findIndex((r) => r.correlationId === correlationId);
+    if (requestIndex === -1) {
+      return res.status(404).json({ error: 'Request not found' });
+    }
+
+  consumer.run({
+    eachMessage: async ({ message }) => {
+      const raw = message.value?.toString() || '{}';
+      const request = JSON.parse(raw);
+      pendingRequests.unshift(request);
+      if (pendingRequests.length > 50) pendingRequests.pop();
+      console.log('📬 new consent request awaiting user decision', request.correlationId);
+    }
+  }).catch((err) => {
+    console.error('Consent consumer failed', err);
+    process.exit(1);
+  });
+  app.get('/', (_req, res) => res.send(renderDashboard()));
+
   const port = process.env.PORT || 3000;
   app.listen(port, () => {
     console.log(`Consent service listening on http://localhost:${port}`);

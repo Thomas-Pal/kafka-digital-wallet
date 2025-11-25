@@ -1,6 +1,6 @@
 # Kafka Digital Consent Wallet PoC
 
-Quick start for a local NHS prescription → Kafka demo, now modelled as a digital wallet where citizens approve or reject DWP data access. For full details see [app/README.md](app/README.md). Host clients should connect to Kafka at **127.0.0.1:29092** (override with `KAFKA_BROKER` if running inside a container network).
+Quick start for a local NHS prescription → Kafka demo, now modelled as a digital wallet where citizens approve or reject DWP data access. For full details see [app/README.md](app/README.md). Host clients should connect to Kafka at **127.0.0.1:29092**.
 
 ## Usage
 ```bash
