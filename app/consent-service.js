@@ -136,6 +136,11 @@ const renderDashboard = () => `
       <strong id="status-text">Connecting to Kafka…</strong>
     </div>
 
+    <div class="spacer">
+      <button id="inject-demo" class="secondary">Inject demo requests</button>
+      <span class="muted">Add sample consent requests if nothing is flowing.</span>
+    </div>
+
     <div class="grid">
       <section>
         <h2>Incoming requests</h2>
@@ -189,6 +194,7 @@ const renderDashboard = () => `
       const decisionsEmpty = document.getElementById('decisions-empty');
       const statusBox = document.getElementById('status');
       const statusText = document.getElementById('status-text');
+      const injectDemo = document.getElementById('inject-demo');
 
       const setStatus = (state, text) => {
         statusBox.dataset.state = state;
@@ -243,7 +249,7 @@ const renderDashboard = () => `
           '</tr>'
         ].join('');
 
-      document.getElementById('inject-demo').addEventListener('click', async () => {
+      injectDemo?.addEventListener('click', async () => {
         try {
           await fetch('/api/demo/requests', { method: 'POST' });
           await refresh();
