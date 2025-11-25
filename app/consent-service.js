@@ -9,8 +9,12 @@ const brokers = brokerConfig
 
 const kafka = new Kafka({ brokers, logLevel: logLevel.NOTHING });
 const consumerGroup = process.env.CONSENT_CONSUMER_GROUP || `consent-service-${Date.now()}`;
-const consumer = kafka.consumer({ groupId: consumerGroup });
-const producer = kafka.producer();
+let consumer = kafka.consumer({ groupId: consumerGroup });
+let producer = kafka.producer();
+
+let kafkaReady = false;
+let connecting = false;
+let lastKafkaError = null;
 
 const pendingRequests = [];
 const decisions = [];
@@ -88,6 +92,9 @@ const renderDashboard = () => `
       button.secondary { background: #475569; }
       button:hover { opacity: 0.9; }
       .grid { display: grid; grid-template-columns: 1fr; gap: 24px; }
+      .status { padding: 12px 14px; background: #0b2537; border: 1px solid #1e293b; border-radius: 8px; margin: 12px 0; }
+      .status[data-state="ok"] { border-color: #14532d; background: #0c2f1f; color: #bbf7d0; }
+      .status[data-state="error"] { border-color: #7f1d1d; background: #2f1316; color: #fecdd3; }
       @media (min-width: 900px) {
         .grid { grid-template-columns: repeat(2, 1fr); }
       }
@@ -96,6 +103,10 @@ const renderDashboard = () => `
   <body>
     <h1>Digital Consent Wallet</h1>
     <p>Approve or deny requests from downstream consumers (e.g. DWP) before your data is shared.</p>
+
+    <div class="status" id="status" data-state="error">
+      <strong id="status-text">Connecting to Kafka…</strong>
+    </div>
 
     <div class="grid">
       <section>
@@ -148,6 +159,32 @@ const renderDashboard = () => `
       const decisionsBody = document.getElementById('decisions-body');
       const requestsEmpty = document.getElementById('requests-empty');
       const decisionsEmpty = document.getElementById('decisions-empty');
+      const statusBox = document.getElementById('status');
+      const statusText = document.getElementById('status-text');
+
+      const setStatus = (state, text) => {
+        statusBox.dataset.state = state;
+        statusText.textContent = text;
+      };
+
+      const fetchStatus = async () => {
+        try {
+          const res = await fetch('/api/status');
+          const status = await res.json();
+          if (status.kafkaReady) {
+            const via = status.brokers?.length ? status.brokers.join(', ') : 'Kafka';
+            const group = status.consumerGroup || 'consent-service';
+            setStatus('ok', 'Connected to Kafka via ' + via + ' (group: ' + group + ')');
+          } else {
+            const suffix = status.lastKafkaError ? ': ' + status.lastKafkaError : '';
+            setStatus('error', 'Kafka not ready' + suffix);
+          }
+          return status;
+        } catch (err) {
+          setStatus('error', 'Consent service unreachable');
+          throw err;
+        }
+      };
 
       const toDecisionRow = (row) =>
         [
@@ -198,6 +235,7 @@ const renderDashboard = () => `
 
       const refresh = async () => {
         try {
+          const status = await fetchStatus();
           const [requestsRes, decisionsRes] = await Promise.all([
             fetch('/api/requests'),
             fetch('/api/decisions')
@@ -220,17 +258,81 @@ const renderDashboard = () => `
   </body>
 </html>`;
 
+const resetKafkaClients = async () => {
+  try {
+    await consumer.disconnect();
+  } catch (err) {
+    if (err?.type !== 'KAFKAJS_NOT_CONNECTED') console.error('Failed to disconnect consumer', err);
+  }
+
+  try {
+    await producer.disconnect();
+  } catch (err) {
+    if (err?.type !== 'KAFKAJS_NOT_CONNECTED') console.error('Failed to disconnect producer', err);
+  }
+
+  consumer = kafka.consumer({ groupId: consumerGroup });
+  producer = kafka.producer();
+};
+
+async function handleKafkaError(err) {
+  kafkaReady = false;
+  lastKafkaError = err?.message || 'Unknown Kafka error';
+  console.error('Consent consumer failed', err);
+  await resetKafkaClients();
+  setTimeout(() => startKafkaConsumer(), 1500);
+}
+
+async function startKafkaConsumer() {
+  if (connecting) return;
+  connecting = true;
+
+  try {
+    await producer.connect();
+    await consumer.connect();
+    await consumer.subscribe({ topic: 'dwp.consent.requests', fromBeginning: true });
+
+    kafkaReady = true;
+    lastKafkaError = null;
+    console.log('🔌 connected to Kafka broker(s)', brokers.join(', '), 'as group', consumerGroup);
+
+    consumer
+      .run({
+        eachMessage: async ({ message }) => {
+          try {
+            const raw = message.value?.toString() || '{}';
+            const request = JSON.parse(raw);
+            upsertRequest(request);
+            console.log('📬 new consent request awaiting user decision', request.correlationId);
+          } catch (err) {
+            console.error('Failed to process consent request message', err);
+          }
+        }
+      })
+      .catch(handleKafkaError);
+  } catch (err) {
+    await handleKafkaError(err);
+  } finally {
+    connecting = false;
+  }
+}
+
 const startService = async () => {
-  await producer.connect();
-  await consumer.connect();
-  await consumer.subscribe({ topic: 'dwp.consent.requests', fromBeginning: true });
-
-  console.log('🔌 connected to Kafka broker(s)', brokers.join(', '), 'as group', consumerGroup);
-
   const app = express();
   app.use(express.json());
 
   app.get('/healthz', (_req, res) => res.send('ok'));
+  app.get('/api/status', (_req, res) =>
+    res.json({
+      kafkaReady,
+      brokers,
+      consumerGroup,
+      pendingCount: pendingRequests.length,
+      decisionsCount: decisions.length,
+      auditCount: auditTrail.length,
+      lastKafkaError
+    })
+  );
   app.get('/api/requests', (_req, res) => res.json(pendingRequests));
   app.get('/api/decisions', (_req, res) => res.json(decisions));
   app.get('/api/audit', (_req, res) => res.json(auditTrail));
@@ -255,15 +357,28 @@ const startService = async () => {
     auditTrail.unshift(auditEvent);
     if (auditTrail.length > 100) auditTrail.pop();
 
-    await producer.send({
-      topic: 'nhs.consent.decisions',
-      messages: [{ key: decisionRecord.patientId, value: JSON.stringify(decisionRecord) }]
-    });
+    if (!kafkaReady) {
+      return res.status(503).json({ error: 'Kafka is not connected; retry shortly' });
+    }
 
-    await producer.send({
-      topic: 'nhs.audit.events',
-      messages: [{ key: decisionRecord.patientId, value: JSON.stringify(auditEvent) }]
-    });
+    try {
+      await producer.send({
+        topic: 'nhs.consent.decisions',
+        messages: [{ key: decisionRecord.patientId, value: JSON.stringify(decisionRecord) }]
+      });
+
+      await producer.send({
+        topic: 'nhs.audit.events',
+        messages: [{ key: decisionRecord.patientId, value: JSON.stringify(auditEvent) }]
+      });
+    } catch (err) {
+      lastKafkaError = err?.message || 'Kafka publish error';
+      kafkaReady = false;
+      console.error('Failed to publish consent decision', err);
+      res.status(503).json({ error: 'Kafka unavailable', details: lastKafkaError });
+      setTimeout(startKafkaConsumer, 1000);
+      return;
+    }
 
     console.log('✅ user decision captured', decisionRecord.patientId, decisionRecord.decision);
     res.json(decisionRecord);
@@ -274,24 +389,7 @@ const startService = async () => {
   app.listen(port, () => {
     console.log(`Consent service listening on http://localhost:${port}`);
   });
-
-  consumer
-    .run({
-      eachMessage: async ({ message }) => {
-        try {
-          const raw = message.value?.toString() || '{}';
-          const request = JSON.parse(raw);
-          upsertRequest(request);
-          console.log('📬 new consent request awaiting user decision', request.correlationId);
-        } catch (err) {
-          console.error('Failed to process consent request message', err);
-        }
-      }
-    })
-    .catch((err) => {
-      console.error('Consent consumer failed', err);
-      process.exit(1);
-    });
+  startKafkaConsumer();
 };
 
 startService().catch((err) => {
