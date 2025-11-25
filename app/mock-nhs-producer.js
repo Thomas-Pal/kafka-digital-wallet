@@ -1,7 +1,12 @@
 import { Kafka } from 'kafkajs';
 
-const broker = process.env.KAFKA_BROKER || '127.0.0.1:29092';
-const kafka = new Kafka({ brokers: [broker] });
+const brokerConfig = process.env.KAFKA_BROKERS || process.env.KAFKA_BROKER || '127.0.0.1:29092,kafka:9092';
+const brokers = brokerConfig
+  .split(',')
+  .map((entry) => entry.trim())
+  .filter(Boolean);
+
+const kafka = new Kafka({ brokers });
 const producer = kafka.producer();
 
 const prescriptions = [
