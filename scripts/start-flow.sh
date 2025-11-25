@@ -7,17 +7,41 @@ set -euo pipefail
 
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 APP_DIR="$ROOT_DIR/app"
+COMPOSE_FILE="$ROOT_DIR/podman-compose.yml"
 
 cd "$ROOT_DIR"
 
-if ! command -v podman-compose >/dev/null 2>&1; then
-  echo "podman-compose is required and was not found in PATH" >&2
+# Decide which container runtime + compose command to use.
+if command -v podman-compose >/dev/null 2>&1; then
+  RUNTIME="podman"
+  COMPOSE_CMD=(podman-compose -f "$COMPOSE_FILE")
+elif command -v docker-compose >/dev/null 2>&1; then
+  RUNTIME="docker"
+  COMPOSE_CMD=(docker-compose -f "$COMPOSE_FILE")
+elif command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then
+  RUNTIME="docker"
+  COMPOSE_CMD=(docker compose -f "$COMPOSE_FILE")
+else
+  echo "podman-compose or docker compose is required to start Kafka" >&2
   exit 1
 fi
 
+# Fail fast if the container runtime is installed but not running (common on macOS with Podman).
+if [[ "$RUNTIME" == "podman" ]]; then
+  if ! podman ps >/dev/null 2>&1; then
+    echo "Podman is installed but not running. Start it first (e.g. 'podman machine start' on macOS)." >&2
+    exit 1
+  fi
+else
+  if ! docker ps >/dev/null 2>&1; then
+    echo "Docker is installed but not running. Start Docker Desktop or the daemon, then re-run this script." >&2
+    exit 1
+  fi
+fi
+
 # 1) Infra
-echo "[1/6] Starting Kafka + Kafka UI with podman-compose..."
-podman-compose up -d
+echo "[1/6] Starting Kafka + Kafka UI with $RUNTIME compose..."
+"${COMPOSE_CMD[@]}" up -d
 
 # 2) Topics
 echo "[2/6] Ensuring required topics exist..."

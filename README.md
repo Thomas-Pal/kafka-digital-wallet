@@ -5,7 +5,7 @@ Quick start for a local NHS prescription → Kafka demo, now modelled as a digit
 ## Usage
 ```bash
 cd kafka-nhs-poc
-podman-compose up -d
+podman-compose up -d   # or: docker compose -f podman-compose.yml up -d
 bash scripts/topics-create.sh
 cd app && npm i
 npm run consume            # terminal A (keep open)
@@ -17,6 +17,6 @@ npm run produce:dwp        # terminal D triggers consent flow
 
 Or run the whole sequence (infra, topics, install, dashboard, consumer, producers) with a single helper:
 ```bash
-bash scripts/start-flow.sh
+bash scripts/start-flow.sh   # requires Podman (podman machine up) or Docker running
 # consent UI at http://localhost:3000, Kafka UI at http://localhost:8080
 ```

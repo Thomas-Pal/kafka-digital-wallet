@@ -4,7 +4,8 @@ A slightly richer corporate PoC showing NHS prescription flows, DWP consent requ
 
 ## 0) Start infra
 ```bash
-podman-compose up -d
+podman-compose up -d                             # Podman (ensure podman machine is running on macOS)
+# or: docker compose -f ../podman-compose.yml up -d   # Docker
 # UI at http://localhost:8080 (cluster: local)
 ```
 
