@@ -1,6 +1,7 @@
 import { Kafka } from 'kafkajs';
 
-const kafka = new Kafka({ brokers: ['127.0.0.1:29092'] });
+const broker = process.env.KAFKA_BROKER || '127.0.0.1:29092';
+const kafka = new Kafka({ brokers: [broker] });
 const producer = kafka.producer();
 
 const consentRequests = [
