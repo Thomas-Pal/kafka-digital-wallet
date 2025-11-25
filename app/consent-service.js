@@ -132,11 +132,6 @@ const renderDashboard = () => `
       <strong id="status-text">Connecting to Kafka…</strong>
     </div>
 
-    <div class="actions" style="margin-bottom: 12px;">
-      <button id="inject-demo">Inject demo requests</button>
-      <button class="secondary" onclick="window.location.reload()">Hard refresh</button>
-    </div>
-
     <div class="grid">
       <section>
         <h2>Incoming requests</h2>
@@ -191,10 +186,10 @@ const renderDashboard = () => `
       const statusBox = document.getElementById('status');
       const statusText = document.getElementById('status-text');
 
-  const setStatus = (state, text) => {
-    statusBox.dataset.state = state;
-    statusText.textContent = text;
-  };
+      const setStatus = (state, text) => {
+        statusBox.dataset.state = state;
+        statusText.textContent = text;
+      };
 
       const fetchStatus = async () => {
         try {
@@ -203,8 +198,7 @@ const renderDashboard = () => `
           if (status.kafkaReady) {
             const via = status.brokers?.length ? status.brokers.join(', ') : 'Kafka';
             const group = status.consumerGroup || 'consent-service';
-            const counts = `pending: ${status.pendingCount}, decisions: ${status.decisionsCount}`;
-            setStatus('ok', 'Connected to Kafka via ' + via + ' (group: ' + group + '; ' + counts + ')');
+            setStatus('ok', 'Connected to Kafka via ' + via + ' (group: ' + group + ')');
           } else {
             const suffix = status.lastKafkaError ? ': ' + status.lastKafkaError : '';
             setStatus('error', 'Kafka not ready' + suffix);
@@ -461,11 +455,6 @@ const startService = async () => {
   app.listen(port, () => {
     console.log(`Consent service listening on http://localhost:${port}`);
   });
-
-  // If the dashboard looks empty after startup, populate some demo requests so users
-  // have something to approve even if Kafka isn't flowing yet.
-  setTimeout(seedDemo, 2000);
-
   startKafkaConsumer();
 };
 
