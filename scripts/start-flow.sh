@@ -54,20 +54,20 @@ npm install
 
 # 4) Run consent dashboard (keeps UI available)
 echo "[4/6] Starting consent dashboard on http://localhost:3000 ..."
-KAFKA_BROKER="127.0.0.1:29092" npm run consent:service &
+KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run consent:service &
 CONSENT_PID=$!
 
 # 5) Run multi-topic consumer
 sleep 2
 echo "[5/6] Starting consumer for nhs + consent topics..."
-TOPICS="nhs.raw.prescriptions,nhs.enriched.prescriptions,dwp.consent.requests,nhs.consent.decisions,nhs.audit.events" npm run consume &
+KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" TOPICS="nhs.raw.prescriptions,nhs.enriched.prescriptions,dwp.consent.requests,nhs.consent.decisions,nhs.audit.events" npm run consume &
 CONSUMER_PID=$!
 
 # 6) Produce demo events
 sleep 2
 echo "[6/6] Producing sample NHS + DWP events..."
-npm run produce:nhs
-npm run produce:dwp
+KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run produce:nhs
+KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run produce:dwp
 
 echo "---"
 echo "Consent UI:   http://localhost:3000"

@@ -40,6 +40,7 @@ npm run consent:service
 # UI/API at http://localhost:3000
 ```
 Consumes DWP requests, queues them for wallet approval, and publishes citizen decisions to `nhs.consent.decisions` plus audit entries to `nhs.audit.events`. The dashboard auto-refreshes every few seconds and shows a waiting state until requests arrive.
+If your Kafka brokers are quiet, use the "Inject demo requests" button (or wait a couple of seconds after startup) to seed sample DWP requests directly from the wallet UI/service.
 
 ## 6) Produce DWP consent requests
 Open a second terminal while the service is running:
