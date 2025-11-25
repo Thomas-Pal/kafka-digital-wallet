@@ -1,0 +1,13 @@
+{
+  "name": "kafka-nhs-poc",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "kafkajs": "^2.2.4"
+  },
+  "scripts": {
+    "produce:nhs": "node mock-nhs-producer.js",
+    "consume": "node simple-consumer.js"
+  }
+}
