@@ -129,7 +129,20 @@ const startService = async () => {
   await consumer.connect();
   await consumer.subscribe({ topic: 'dwp.consent.requests', fromBeginning: true });
 
-  await consumer.run({
+  const app = express();
+  app.use(express.json());
+
+  app.get('/healthz', (_req, res) => res.send('ok'));
+  app.get('/api/decisions', (_req, res) => res.json(decisions));
+  app.get('/api/audit', (_req, res) => res.json(auditTrail));
+  app.get('/', (_req, res) => res.send(renderDashboard()));
+
+  const port = process.env.PORT || 3000;
+  app.listen(port, () => {
+    console.log(`Consent service listening on http://localhost:${port}`);
+  });
+
+  consumer.run({
     eachMessage: async ({ message }) => {
       const raw = message.value?.toString() || '{}';
       const request = JSON.parse(raw);
@@ -154,19 +167,9 @@ const startService = async () => {
 
       console.log('✅ consent decision', decision.patientId, decision.decision);
     }
-  });
-
-  const app = express();
-  app.use(express.json());
-
-  app.get('/healthz', (_req, res) => res.send('ok'));
-  app.get('/api/decisions', (_req, res) => res.json(decisions));
-  app.get('/api/audit', (_req, res) => res.json(auditTrail));
-  app.get('/', (_req, res) => res.send(renderDashboard()));
-
-  const port = process.env.PORT || 3000;
-  app.listen(port, () => {
-    console.log(`Consent service listening on http://localhost:${port}`);
+  }).catch((err) => {
+    console.error('Consent consumer failed', err);
+    process.exit(1);
   });
 };
 
