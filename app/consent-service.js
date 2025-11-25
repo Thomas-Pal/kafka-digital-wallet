@@ -3,12 +3,26 @@ import { Kafka, logLevel } from 'kafkajs';
 
 const broker = process.env.KAFKA_BROKER || '127.0.0.1:29092';
 const kafka = new Kafka({ brokers: [broker], logLevel: logLevel.NOTHING });
-const consumer = kafka.consumer({ groupId: 'consent-service' });
+const consumerGroup = process.env.CONSENT_CONSUMER_GROUP || `consent-service-${Date.now()}`;
+const consumer = kafka.consumer({ groupId: consumerGroup });
 const producer = kafka.producer();
 
 const pendingRequests = [];
 const decisions = [];
 const auditTrail = [];
+
+const upsertRequest = (request) => {
+  if (!request?.correlationId) return;
+
+  // Skip if a decision already exists for this correlation ID.
+  if (decisions.some((d) => d.correlationId === request.correlationId)) return;
+
+  const existingIndex = pendingRequests.findIndex((r) => r.correlationId === request.correlationId);
+  if (existingIndex !== -1) pendingRequests.splice(existingIndex, 1);
+
+  pendingRequests.unshift(request);
+  if (pendingRequests.length > 50) pendingRequests.pop();
+};
 
 const buildDecision = (request, { decision, reason }) => ({
   ...request,
@@ -206,7 +220,7 @@ const startService = async () => {
   await consumer.connect();
   await consumer.subscribe({ topic: 'dwp.consent.requests', fromBeginning: true });
 
-  console.log('🔌 connected to Kafka broker', broker);
+  console.log('🔌 connected to Kafka broker', broker, 'as group', consumerGroup);
 
   const app = express();
   app.use(express.json());
@@ -262,8 +276,7 @@ const startService = async () => {
         try {
           const raw = message.value?.toString() || '{}';
           const request = JSON.parse(raw);
-          pendingRequests.unshift(request);
-          if (pendingRequests.length > 50) pendingRequests.pop();
+          upsertRequest(request);
           console.log('📬 new consent request awaiting user decision', request.correlationId);
         } catch (err) {
           console.error('Failed to process consent request message', err);
