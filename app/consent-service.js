@@ -94,16 +94,18 @@ const renderDashboard = () => `
       const tbody = document.querySelector('tbody');
       const emptyState = document.getElementById('empty-state');
 
-      const toRow = (row) => `
-        <tr>
-          <td>${row.correlationId}</td>
-          <td>${row.patientId}</td>
-          <td>${row.requestingSystem}</td>
-          <td>${row.purpose}</td>
-          <td>${row.decision}</td>
-          <td>${row.reason}</td>
-          <td>${row.decidedAt}</td>
-        </tr>`;
+      const toRow = (row) =>
+        [
+          '<tr>',
+          '<td>' + row.correlationId + '</td>',
+          '<td>' + row.patientId + '</td>',
+          '<td>' + row.requestingSystem + '</td>',
+          '<td>' + row.purpose + '</td>',
+          '<td>' + row.decision + '</td>',
+          '<td>' + row.reason + '</td>',
+          '<td>' + row.decidedAt + '</td>',
+          '</tr>'
+        ].join('');
 
       const refresh = async () => {
         try {
