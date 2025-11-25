@@ -35,7 +35,7 @@ const recordAudit = (decision) => ({
   occurredAt: decision.decidedAt
 });
 
-const renderTable = (rows) =>
+const renderRows = (rows) =>
   rows
     .map(
       (row) => `
@@ -62,6 +62,8 @@ const renderDashboard = () => `
       table { border-collapse: collapse; width: 100%; }
       th, td { border: 1px solid #ddd; padding: 8px; }
       th { background: #f3f4f6; text-align: left; }
+      .muted { color: #6b7280; }
+      .spacer { margin-top: 1rem; }
     </style>
   </head>
   <body>
@@ -80,10 +82,43 @@ const renderDashboard = () => `
         </tr>
       </thead>
       <tbody>
-        ${renderTable(decisions)}
+        ${renderRows(decisions)}
       </tbody>
     </table>
-    <p><small>API endpoints: <code>/api/decisions</code>, <code>/api/audit</code>, <code>/healthz</code></small></p>
+    <div class="spacer muted" id="empty-state" ${decisions.length ? 'style="display:none"' : ''}>
+      Waiting for consent decisions… run the DWP producer to see rows arrive.
+    </div>
+    <p class="spacer"><small>API endpoints: <code>/api/decisions</code>, <code>/api/audit</code>, <code>/healthz</code></small></p>
+
+    <script>
+      const tbody = document.querySelector('tbody');
+      const emptyState = document.getElementById('empty-state');
+
+      const toRow = (row) => `
+        <tr>
+          <td>${row.correlationId}</td>
+          <td>${row.patientId}</td>
+          <td>${row.requestingSystem}</td>
+          <td>${row.purpose}</td>
+          <td>${row.decision}</td>
+          <td>${row.reason}</td>
+          <td>${row.decidedAt}</td>
+        </tr>`;
+
+      const refresh = async () => {
+        try {
+          const res = await fetch('/api/decisions');
+          const data = await res.json();
+          tbody.innerHTML = data.map(toRow).join('');
+          emptyState.style.display = data.length ? 'none' : 'block';
+        } catch (err) {
+          console.error('Failed to refresh decisions', err);
+        }
+      };
+
+      refresh();
+      setInterval(refresh, 3000);
+    </script>
   </body>
 </html>`;
 

@@ -36,7 +36,8 @@ Emits both `nhs.raw.prescriptions` and `nhs.enriched.prescriptions` events per p
 npm run consent:service
 # UI/API at http://localhost:3000
 ```
-Consumes DWP requests, publishes decisions to `nhs.consent.decisions` and audit entries to `nhs.audit.events`.
+Consumes DWP requests, publishes decisions to `nhs.consent.decisions` and audit entries to `nhs.audit.events`. The dashboard
+auto-refreshes every few seconds and shows a waiting state until requests arrive.
 
 ## 6) Produce DWP consent requests
 Open a second terminal while the service is running:
