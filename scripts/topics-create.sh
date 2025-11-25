@@ -2,8 +2,17 @@
 set -euo pipefail
 BROKER="127.0.0.1:29092"
 
-podman exec kafka kafka-topics --bootstrap-server $BROKER \
-  --create --topic nhs.raw.prescriptions --partitions 1 --replication-factor 1 || true
+TOPICS=(
+  "nhs.raw.prescriptions"
+  "nhs.enriched.prescriptions"
+  "nhs.audit.events"
+  "dwp.consent.requests"
+  "nhs.consent.decisions"
+)
 
-podman exec kafka kafka-topics --bootstrap-server $BROKER --list
+for topic in "${TOPICS[@]}"; do
+  podman exec kafka kafka-topics --bootstrap-server "$BROKER" \
+    --create --topic "$topic" --partitions 1 --replication-factor 1 || true
+done
 
+podman exec kafka kafka-topics --bootstrap-server "$BROKER" --list
