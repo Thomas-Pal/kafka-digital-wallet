@@ -12,6 +12,9 @@ const consumerGroup = process.env.CONSENT_CONSUMER_GROUP || `consent-service-${D
 let consumer = kafka.consumer({ groupId: consumerGroup });
 let producer = kafka.producer();
 
+const autoSeedDelayMs = Number(process.env.AUTO_SEED_MS || 4000);
+let autoSeeded = false;
+
 let kafkaReady = false;
 let connecting = false;
 let lastKafkaError = null;
@@ -119,6 +122,7 @@ const renderDashboard = () => `
       .status { padding: 12px 14px; background: #0b2537; border: 1px solid #1e293b; border-radius: 8px; margin: 12px 0; }
       .status[data-state="ok"] { border-color: #14532d; background: #0c2f1f; color: #bbf7d0; }
       .status[data-state="error"] { border-color: #7f1d1d; background: #2f1316; color: #fecdd3; }
+      .status[data-state="warn"] { border-color: #92400e; background: #2f1b0f; color: #fbbf24; }
       @media (min-width: 900px) {
         .grid { grid-template-columns: repeat(2, 1fr); }
       }
@@ -191,22 +195,24 @@ const renderDashboard = () => `
         statusText.textContent = text;
       };
 
-      const fetchStatus = async () => {
-        try {
-          const res = await fetch('/api/status');
-          const status = await res.json();
-          if (status.kafkaReady) {
-            const via = status.brokers?.length ? status.brokers.join(', ') : 'Kafka';
-            const group = status.consumerGroup || 'consent-service';
-            setStatus('ok', 'Connected to Kafka via ' + via + ' (group: ' + group + ')');
-          } else {
-            const suffix = status.lastKafkaError ? ': ' + status.lastKafkaError : '';
-            setStatus('error', 'Kafka not ready' + suffix);
-          }
-          return status;
-        } catch (err) {
-          setStatus('error', 'Consent service unreachable');
-          throw err;
+      const fetchState = async () => {
+        const res = await fetch('/api/state');
+        if (!res.ok) throw new Error('Failed to fetch dashboard state');
+        return res.json();
+      };
+
+      const applyStatus = (status) => {
+        const suffix = status.pendingCount === 0 && status.decisionsCount === 0
+          ? ' — waiting for requests (or use demo injector).'
+          : '';
+
+        if (status.kafkaReady) {
+          const via = status.brokers?.length ? status.brokers.join(', ') : 'Kafka';
+          const group = status.consumerGroup || 'consent-service';
+          setStatus('ok', 'Connected to Kafka via ' + via + ' (group: ' + group + ')' + suffix);
+        } else {
+          const kafkaSuffix = status.lastKafkaError ? ': ' + status.lastKafkaError : '';
+          setStatus('warn', 'Kafka not ready' + kafkaSuffix + suffix);
         }
       };
 
@@ -268,12 +274,10 @@ const renderDashboard = () => `
 
       const refresh = async () => {
         try {
-          const status = await fetchStatus();
-          const [requestsRes, decisionsRes] = await Promise.all([
-            fetch('/api/requests'),
-            fetch('/api/decisions')
-          ]);
-          const [requests, decisions] = await Promise.all([requestsRes.json(), decisionsRes.json()]);
+          const state = await fetchState();
+          const { status, requests, decisions } = state;
+
+          applyStatus(status);
 
           requestsBody.innerHTML = requests.map(toRequestRow).join('');
           decisionsBody.innerHTML = decisions.map(toDecisionRow).join('');
@@ -281,6 +285,7 @@ const renderDashboard = () => `
           requestsEmpty.style.display = requests.length ? 'none' : 'block';
           decisionsEmpty.style.display = decisions.length ? 'none' : 'block';
         } catch (err) {
+          setStatus('error', 'Consent service unreachable');
           console.error('Failed to refresh dashboard', err);
         }
       };
@@ -350,21 +355,52 @@ async function startKafkaConsumer() {
   }
 }
 
+const statusSnapshot = () => ({
+  kafkaReady,
+  brokers,
+  consumerGroup,
+  pendingCount: pendingRequests.length,
+  decisionsCount: decisions.length,
+  auditCount: auditTrail.length,
+  lastKafkaError,
+  autoSeeded
+});
+
+const seedDemo = async () => {
+  const now = Date.now();
+  const entries = demoRequests.map((req, idx) => ({
+    ...req,
+    correlationId: `${req.correlationId}-${now}-${idx}`,
+    requestedAt: new Date().toISOString()
+  }));
+
+  for (const entry of entries) {
+    upsertRequest(entry);
+  }
+
+  if (kafkaReady) {
+    try {
+      await producer.send({
+        topic: 'dwp.consent.requests',
+        messages: entries.map((req) => ({ key: req.patientId, value: JSON.stringify(req) }))
+      });
+      console.log('🧪 seeded demo consent requests into Kafka');
+    } catch (err) {
+      console.error('Failed to seed demo requests into Kafka', err);
+    }
+  } else {
+    console.log('🧪 demo requests added locally (Kafka not connected yet)');
+  }
+};
+
 const startService = async () => {
   const app = express();
   app.use(express.json());
 
   app.get('/healthz', (_req, res) => res.send('ok'));
-  app.get('/api/status', (_req, res) =>
-    res.json({
-      kafkaReady,
-      brokers,
-      consumerGroup,
-      pendingCount: pendingRequests.length,
-      decisionsCount: decisions.length,
-      auditCount: auditTrail.length,
-      lastKafkaError
-    })
+  app.get('/api/status', (_req, res) => res.json(statusSnapshot()));
+  app.get('/api/state', (_req, res) =>
+    res.json({ status: statusSnapshot(), requests: pendingRequests, decisions })
   );
   app.get('/api/requests', (_req, res) => res.json(pendingRequests));
   app.get('/api/decisions', (_req, res) => res.json(decisions));
@@ -417,33 +453,6 @@ const startService = async () => {
     res.json(decisionRecord);
   });
 
-  const seedDemo = async () => {
-    const now = Date.now();
-    const entries = demoRequests.map((req, idx) => ({
-      ...req,
-      correlationId: `${req.correlationId}-${now}-${idx}`,
-      requestedAt: new Date().toISOString()
-    }));
-
-    for (const entry of entries) {
-      upsertRequest(entry);
-    }
-
-    if (kafkaReady) {
-      try {
-        await producer.send({
-          topic: 'dwp.consent.requests',
-          messages: entries.map((req) => ({ key: req.patientId, value: JSON.stringify(req) }))
-        });
-        console.log('🧪 seeded demo consent requests into Kafka');
-      } catch (err) {
-        console.error('Failed to seed demo requests into Kafka', err);
-      }
-    } else {
-      console.log('🧪 demo requests added locally (Kafka not connected yet)');
-    }
-  };
-
   app.post('/api/demo/requests', async (_req, res) => {
     await seedDemo();
     res.json({ status: 'ok', count: pendingRequests.length });
@@ -458,7 +467,18 @@ const startService = async () => {
   startKafkaConsumer();
 };
 
+const scheduleAutoSeed = () => {
+  if (autoSeeded || autoSeedDelayMs <= 0) return;
+  setTimeout(async () => {
+    if (pendingRequests.length || decisions.length) return;
+    await seedDemo();
+    autoSeeded = true;
+  }, autoSeedDelayMs);
+};
+
 startService().catch((err) => {
   console.error('Consent service failed to start', err);
   process.exit(1);
 });
+
+scheduleAutoSeed();
