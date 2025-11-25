@@ -1,8 +1,13 @@
 import express from 'express';
 import { Kafka, logLevel } from 'kafkajs';
 
-const broker = process.env.KAFKA_BROKER || '127.0.0.1:29092';
-const kafka = new Kafka({ brokers: [broker], logLevel: logLevel.NOTHING });
+const brokerConfig = process.env.KAFKA_BROKER || process.env.KAFKA_BROKERS || '127.0.0.1:29092,kafka:9092';
+const brokers = brokerConfig
+  .split(',')
+  .map((entry) => entry.trim())
+  .filter(Boolean);
+
+const kafka = new Kafka({ brokers, logLevel: logLevel.NOTHING });
 const consumerGroup = process.env.CONSENT_CONSUMER_GROUP || `consent-service-${Date.now()}`;
 const consumer = kafka.consumer({ groupId: consumerGroup });
 const producer = kafka.producer();
@@ -220,7 +225,7 @@ const startService = async () => {
   await consumer.connect();
   await consumer.subscribe({ topic: 'dwp.consent.requests', fromBeginning: true });
 
-  console.log('🔌 connected to Kafka broker', broker, 'as group', consumerGroup);
+  console.log('🔌 connected to Kafka broker(s)', brokers.join(', '), 'as group', consumerGroup);
 
   const app = express();
   app.use(express.json());
