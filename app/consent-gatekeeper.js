@@ -28,6 +28,7 @@ let connecting = false;
 let lastKafkaError = null;
 
 const consentByPatient = new Map();
+const latestPrescriptionByPatient = new Map();
 let approvedCount = 0;
 let blockedCount = 0;
 
@@ -37,6 +38,9 @@ const upsertConsent = (decision) => {
 };
 
 const evaluatePrescription = async (event) => {
+  if (!event?.patientId) return;
+
+  latestPrescriptionByPatient.set(event.patientId, event);
   const consent = consentByPatient.get(event.patientId);
 
   if (consent?.decision === 'approved') {
@@ -101,6 +105,13 @@ async function startKafka() {
           if (consentTopics.includes(topic)) {
             upsertConsent(payload);
             console.log('📥 consent cache updated for', payload.patientId, payload.decision);
+            if (payload.decision === 'approved') {
+              const cached = latestPrescriptionByPatient.get(payload.patientId);
+              if (cached) {
+                await evaluatePrescription(cached);
+                console.log('🔁 replayed cached prescription for', payload.patientId, 'after approval');
+              }
+            }
             return;
           }
 

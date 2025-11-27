@@ -39,24 +39,6 @@ kill_port() {
   fi
 }
 
-wait_for_decision() {
-  local attempts=600
-  local url="http://localhost:3000/api/decisions"
-
-  for i in $(seq 1 "$attempts"); do
-    local count
-    count=$(curl -fsS "$url" 2>/dev/null | node -e "let data='';process.stdin.on('data',c=>data+=c);process.stdin.on('end',()=>{try{const parsed=JSON.parse(data||'[]');if(Array.isArray(parsed)){console.log(parsed.length);}else if(parsed && typeof parsed==='object'){console.log(Object.keys(parsed).length);}else{console.log(0);}}catch(e){console.log(0);}});")
-    if [[ "$count" -ge 1 ]]; then
-      echo "✓ Wallet has recorded at least one decision (${count} total)"
-      return 0
-    fi
-    sleep 1
-  done
-
-  echo "Wallet decisions did not arrive after ${attempts}s; you can still run 'npm run produce:nhs' later once approved." >&2
-  return 1
-}
-
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 APP_DIR="$ROOT_DIR/app"
 COMPOSE_FILE="$ROOT_DIR/podman-compose.yml"
@@ -141,14 +123,10 @@ DEMO_RUN_ID="$DEMO_RUN_ID" KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run dw
 DWP_PORTAL_PID=$!
 wait_for_http "http://localhost:4000/healthz" "DWP portal"
 
-# 9) Wait for a wallet decision, then produce NHS records that will be gated by consent
+# 9) Publish NHS records first (they exist from the GP visit before consent is requested)
 sleep 2
-echo "[9/9] Waiting for a consent decision (approve/reject) before publishing NHS prescriptions..."
-if wait_for_decision; then
-  KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run produce:nhs
-else
-  echo "Skipping automatic NHS publish; re-run 'npm run produce:nhs' once a consent decision exists."
-fi
+echo "[9/9] Publishing NHS prescription events (these were recorded by the GP before the DWP caseworker asks for access)..."
+KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run produce:nhs
 
 echo "---"
 echo "Consent UI:    http://localhost:3000"
@@ -157,7 +135,9 @@ echo "DWP portal:    http://localhost:4000"
 echo "Kafka UI:      http://localhost:8080"
 echo "Kafka broker:  127.0.0.1:29092"
 echo "Demo run ID:   ${DEMO_RUN_ID}"
-echo "Use the DWP portal to send a consent request to the wallet, then approve/reject it in the consent UI."
+echo "1) From the DWP portal, send a consent request to the wallet for the patient/case."
+echo "2) In the wallet, approve/reject and choose how long to grant access."
+echo "3) Once approved, the gatekeeper replays the stored NHS record into the filtered DWP view."
 echo "Press Ctrl+C to stop the consumer + consent service"
 
 trap 'echo "Stopping background services..."; kill $CONSUMER_PID $CONSENT_PID $GATEKEEPER_PID $DWP_PORTAL_PID 2>/dev/null || true' INT TERM

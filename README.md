@@ -13,8 +13,8 @@ npm run consent:service    # terminal B (serves UI at http://localhost:3000)
 npm run produce:nhs        # terminal C
 npm run consent:gatekeeper # terminal D performs stream-table join + publishes filtered view
 npm run dwp:portal         # terminal E shows filtered NHS view for DWP at http://localhost:4000
-# From the portal, send consent requests to the wallet, approve/reject in the wallet UI, then re-run `npm run produce:nhs` to s
-ee filtered output.
+# From the portal, send consent requests to the wallet and approve/reject in the wallet UI.
+# The gatekeeper caches raw prescriptions and replays them to the DWP filtered topic as soon as consent is approved.
 # (Optional UI) open http://localhost:8080 for Kafka UI
 ```
 
@@ -23,6 +23,5 @@ Or run the whole sequence (infra, topics, install, dashboard, consumer, gatekeep
 bash scripts/start-flow.sh   # requires Podman (podman machine up) or Docker running
 # consent UI at http://localhost:3000, Kafka UI at http://localhost:8080
 # DWP portal at http://localhost:4000 (filtered by consent via gatekeeper service)
-# Use the portal to send a consent request, approve or reject it in the wallet, and the script will publish NHS events afterward
-s so the filtered view shows up-to-date results.
+# Flow: the script publishes NHS prescriptions first (as if a GP visit already happened), then you send/approve consent from the portal/wallet to unlock the cached record for the DWP caseworker.
 ```

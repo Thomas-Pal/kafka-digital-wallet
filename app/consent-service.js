@@ -12,9 +12,6 @@ const consumerGroup = process.env.CONSENT_CONSUMER_GROUP || `consent-service-${D
 let consumer = kafka.consumer({ groupId: consumerGroup });
 let producer = kafka.producer();
 
-const autoSeedDelayMs = Number(process.env.AUTO_SEED_MS || 4000);
-let autoSeeded = false;
-
 let kafkaReady = false;
 let connecting = false;
 let lastKafkaError = null;
@@ -368,8 +365,7 @@ const statusSnapshot = () => ({
   pendingCount: pendingRequests.length,
   decisionsCount: decisions.length,
   auditCount: auditTrail.length,
-  lastKafkaError,
-  autoSeeded
+  lastKafkaError
 });
 
 const seedDemo = async () => {
@@ -483,18 +479,7 @@ const startService = async () => {
   startKafkaConsumer();
 };
 
-const scheduleAutoSeed = () => {
-  if (autoSeeded || autoSeedDelayMs <= 0) return;
-  setTimeout(async () => {
-    if (pendingRequests.length || decisions.length) return;
-    await seedDemo();
-    autoSeeded = true;
-  }, autoSeedDelayMs);
-};
-
 startService().catch((err) => {
   console.error('Consent service failed to start', err);
   process.exit(1);
 });
-
-scheduleAutoSeed();
