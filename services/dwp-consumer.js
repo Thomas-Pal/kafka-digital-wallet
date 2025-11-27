@@ -15,6 +15,25 @@ const kafka = new Kafka({ brokers: BROKERS, logLevel: logLevel.NOTHING });
 const viewConsumer = kafka.consumer({ groupId: 'dwp-case-views' });
 const consentConsumer = kafka.consumer({ groupId: 'dwp-consent-status' });
 
+async function waitForKafka() {
+  const admin = kafka.admin();
+  try {
+    await admin.connect();
+    let ready = false;
+    while (!ready) {
+      try {
+        await admin.fetchTopicMetadata({ topics: [CONSENT_TOPIC] });
+        ready = true;
+      } catch (err) {
+        console.warn('[dwp-api] waiting for Kafka...', err.message);
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+    }
+  } finally {
+    await admin.disconnect().catch(() => {});
+  }
+}
+
 const cases = new Map(
   DEMO_CASES.map((c) => [
     c.caseId,
@@ -115,9 +134,11 @@ app.get('/api/case/:caseId/view', (req, res) => {
   res.json(current.rows.slice(-50));
 });
 
-Promise.all([startViewConsumer(), startConsentConsumer()]).catch((err) => {
-  console.error(err);
-  process.exit(1);
-});
+waitForKafka()
+  .then(() => Promise.all([startViewConsumer(), startConsentConsumer()]))
+  .catch((err) => {
+    console.error(err);
+    process.exit(1);
+  });
 
 app.listen(5001, () => console.log('DWP API on :5001 (GET /api/cases, POST /api/case/:caseId/request-consent, GET /api/case/:caseId/view)'));

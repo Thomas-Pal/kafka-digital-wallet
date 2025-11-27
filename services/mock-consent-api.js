@@ -15,6 +15,27 @@ app.options('*', (_req, res) => res.sendStatus(204));
 
 const kafka = new Kafka({ brokers: BROKERS });
 const producer = kafka.producer();
+
+async function waitForKafka() {
+  const admin = kafka.admin();
+  try {
+    await admin.connect();
+    let ready = false;
+    while (!ready) {
+      try {
+        await admin.fetchTopicMetadata();
+        ready = true;
+      } catch (err) {
+        console.warn('[consent-api] waiting for Kafka...', err.message);
+        await new Promise((r) => setTimeout(r, 1000));
+      }
+    }
+  } finally {
+    await admin.disconnect().catch(() => {});
+  }
+}
+
+await waitForKafka();
 await producer.connect();
 
 // In-memory request/consent status store for the demo wallet to poll
@@ -56,17 +77,27 @@ app.post('/consent/grant', async (req, res) => {
     issuedAt: new Date().toISOString(),
     expiresAt: new Date(Date.now() + ttlDays * 864e5).toISOString()
   };
-  await producer.send({ topic: CONSENT_TOPIC, messages: [{ key: `${rp}|${caseId}|${citizenId}`, value: JSON.stringify(evt) }] });
-  updateStatus(rp, caseId, citizenId, 'granted');
-  res.json({ ok: true, evt });
+  try {
+    await producer.send({ topic: CONSENT_TOPIC, messages: [{ key: `${rp}|${caseId}|${citizenId}`, value: JSON.stringify(evt) }] });
+    updateStatus(rp, caseId, citizenId, 'granted');
+    res.json({ ok: true, evt });
+  } catch (err) {
+    console.error('[consent-api] failed to send grant', err.message);
+    res.status(500).json({ ok: false, message: 'Failed to emit consent', error: err.message });
+  }
 });
 
 app.post('/consent/revoke', async (req, res) => {
   const { rp, caseId, citizenId } = req.body;
   const evt = { eventType: 'revoke', rp, caseId, citizenId, at: new Date().toISOString() };
-  await producer.send({ topic: CONSENT_TOPIC, messages: [{ key: `${rp}|${caseId}|${citizenId}`, value: JSON.stringify(evt) }] });
-  updateStatus(rp, caseId, citizenId, 'revoked');
-  res.json({ ok: true, evt });
+  try {
+    await producer.send({ topic: CONSENT_TOPIC, messages: [{ key: `${rp}|${caseId}|${citizenId}`, value: JSON.stringify(evt) }] });
+    updateStatus(rp, caseId, citizenId, 'revoked');
+    res.json({ ok: true, evt });
+  } catch (err) {
+    console.error('[consent-api] failed to send revoke', err.message);
+    res.status(500).json({ ok: false, message: 'Failed to emit consent', error: err.message });
+  }
 });
 
 app.listen(4000, () => console.log('Consent API on :4000'));

@@ -36,7 +36,22 @@ const ensureViewTopic = async (topic) => {
 const forwardIfPermitted = async (caseId, citizenId, minimal) => {
   const key = keyFor('dwp', caseId, citizenId);
   const consentEntry = consentStore.get(key);
-  if (!consentEntry || !consentEntry.active || new Date(consentEntry.expiresAt) < new Date() || !consentEntry.scopes.has('prescriptions')) return;
+  if (!consentEntry) {
+    console.log('[gatekeeper] skip - no consent', key);
+    return;
+  }
+  if (!consentEntry.active) {
+    console.log('[gatekeeper] skip - consent inactive', key);
+    return;
+  }
+  if (new Date(consentEntry.expiresAt) < new Date()) {
+    console.log('[gatekeeper] skip - consent expired', key);
+    return;
+  }
+  if (!consentEntry.scopes.has('prescriptions')) {
+    console.log('[gatekeeper] skip - scope missing', key);
+    return;
+  }
 
   const viewTopic = VIEW_TOPIC(caseId, citizenId);
   await ensureViewTopic(viewTopic);
@@ -130,5 +145,6 @@ runWithRetry('gatekeeper-raw', raw, async ({ message }) => {
     }
   };
   bufferRaw(event.patientId, minimal);
+  console.log('[raw]', event.patientId, minimal.prescription.drug);
   await forwardIfPermitted(caseId, event.patientId, minimal);
 });

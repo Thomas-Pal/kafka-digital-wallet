@@ -52,6 +52,8 @@ bash scripts/demo.sh
 
 If you can still reach Kafka UI at http://localhost:8080 but Podman Desktop shows **no containers**, it usually means Kafka is running from another engine (for example Docker) or your Podman machine never started. Either stop the other engine or let `scripts/demo.sh` create/start `podman-machine-default` so the compose stack has somewhere to run.
 
+If consent seems stuck, check `./logs/consent-api.log`, `./logs/gatekeeper.log`, and `./logs/dwp-api.log`: the consent API now retries until Kafka is reachable and logs any publish errors; the gatekeeper logs why it skips RAW events (no consent, inactive/expired, missing scope) and the DWP API waits for Kafka before subscribing so VIEW messages appear as soon as consent is granted.
+
 ## Manual steps (if you prefer)
 1) Start Kafka + UI
 ```bash
