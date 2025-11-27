@@ -28,48 +28,55 @@ const cases = new Map(
   ])
 );
 
+async function runWithRetry(label, consumer, handler) {
+  while (true) {
+    try {
+      await consumer.run({ eachMessage: handler });
+    } catch (err) {
+      console.error(`[${label}] restart in 2s`, err.message);
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+  }
+}
+
 async function startViewConsumer() {
   await viewConsumer.connect();
   for (const c of DEMO_CASES) {
     await viewConsumer.subscribe({ topic: VIEW_TOPIC(c.caseId, c.citizenId), fromBeginning: true });
   }
-  await viewConsumer.run({
-    eachMessage: async ({ topic, message }) => {
-      const value = JSON.parse(message.value.toString());
-      const [_, __, ___, caseId] = topic.split('.');
-      const current = cases.get(caseId);
-      if (!current) return;
-      current.rows.push({ ts: Date.now(), v: value });
-      current.consentRequested = true;
-      current.consentStatus = 'granted';
-      current.lastConsentEvent = new Date().toISOString();
-      cases.set(caseId, { ...current });
-      console.log('DWP VIEW:', caseId, value.patientId, value.prescription.drug);
-    }
+  await runWithRetry('dwp-views', viewConsumer, async ({ topic, message }) => {
+    const value = JSON.parse(message.value.toString());
+    const [_, __, ___, caseId] = topic.split('.');
+    const current = cases.get(caseId);
+    if (!current) return;
+    current.rows.push({ ts: Date.now(), v: value });
+    current.consentRequested = true;
+    current.consentStatus = 'granted';
+    current.lastConsentEvent = new Date().toISOString();
+    cases.set(caseId, { ...current });
+    console.log('DWP VIEW:', caseId, value.patientId, value.prescription.drug);
   });
 }
 
 async function startConsentConsumer() {
   await consentConsumer.connect();
   await consentConsumer.subscribe({ topic: CONSENT_TOPIC, fromBeginning: true });
-  await consentConsumer.run({
-    eachMessage: async ({ message }) => {
-      const evt = JSON.parse(message.value.toString());
-      const current = cases.get(evt.caseId);
-      if (!current) return;
-      if (evt.eventType === 'grant') {
-        current.consentRequested = true;
-        current.consentStatus = 'granted';
-        current.lastConsentEvent = evt.issuedAt;
-      }
-      if (evt.eventType === 'revoke') {
-        current.consentRequested = true;
-        current.consentStatus = 'revoked';
-        current.lastConsentEvent = evt.at;
-      }
-      cases.set(evt.caseId, { ...current });
-      console.log('[consent-status]', evt.caseId, current.consentStatus);
+  await runWithRetry('dwp-consent-status', consentConsumer, async ({ message }) => {
+    const evt = JSON.parse(message.value.toString());
+    const current = cases.get(evt.caseId);
+    if (!current) return;
+    if (evt.eventType === 'grant') {
+      current.consentRequested = true;
+      current.consentStatus = 'granted';
+      current.lastConsentEvent = evt.issuedAt;
     }
+    if (evt.eventType === 'revoke') {
+      current.consentRequested = true;
+      current.consentStatus = 'revoked';
+      current.lastConsentEvent = evt.at;
+    }
+    cases.set(evt.caseId, { ...current });
+    console.log('[consent-status]', evt.caseId, current.consentStatus);
   });
 }
 

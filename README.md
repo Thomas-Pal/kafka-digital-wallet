@@ -42,7 +42,7 @@ Kafka infra (Podman): `podman-compose.yml` spins up a single KRaft broker (PLAIN
 - VIEW (per case/citizen): `views.permitted.dwp.<caseId>.<citizenId>` with `retention.ms=604800000` (7 days) — created on demand when consent is active.
 
 ## One-hit demo runner (preferred)
-This brings everything up, seeds RAW events, and leaves you to click Allow/Revoke in the wallet while the portal updates.
+This brings everything up, seeds RAW events, and leaves you to click Allow/Revoke in the wallet while the portal updates. On macOS, it will auto-start the Podman machine if it's stopped to avoid the “exit status 125” error.
 ```bash
 bash scripts/demo.sh
 # logs land in ./logs/*.log; Ctrl+C stops background services started by the script
@@ -90,6 +90,7 @@ bash scripts/seed.sh
 - **Offsets**: consumers subscribe with `fromBeginning:true`; change `groupId` if you need a fresh read.
 - **Consent flow**: gatekeeper subscribes to both RAW and `consent.events`; DWP reads only VIEW topics.
 - **CORS**: mock services send permissive headers so Vite dev servers can call them directly.
+- **Broker not ready / coordinator errors**: gatekeeper and DWP consumers auto-retry if the broker isn't ready yet, so leave them running while Podman finishes bringing Kafka up.
 
 ## Architecture beat-by-beat (what we show live)
 - **NHS event published**: “Prescription issued for Joe” arrives in RAW (red) topic.

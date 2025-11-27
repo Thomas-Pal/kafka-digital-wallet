@@ -1,4 +1,4 @@
-import { Kafka } from 'kafkajs';
+import { Kafka, Partitioners } from 'kafkajs';
 import { BROKERS, RAW_TOPIC, CONSENT_TOPIC, VIEW_TOPIC, CASE_BY_CITIZEN } from './config.js';
 
 const kafka = new Kafka({ brokers: BROKERS });
@@ -55,7 +55,7 @@ const replayBuffered = async (rp, caseId, citizenId) => {
   }
 };
 
-const producer = kafka.producer();
+const producer = kafka.producer({ createPartitioner: Partitioners.LegacyPartitioner });
 
 const waitForKafka = async () => {
   await admin.connect();
@@ -74,63 +74,61 @@ const waitForKafka = async () => {
 await waitForKafka();
 await producer.connect();
 
+const runWithRetry = async (label, consumer, handler) => {
+  // simple forever loop to handle transient coordinator/metadata errors
+  while (true) {
+    try {
+      await consumer.run({ eachMessage: handler });
+    } catch (err) {
+      console.error(`[${label}] restart in 2s`, err.message);
+      await new Promise((r) => setTimeout(r, 2000));
+    }
+  }
+};
+
 // consume consent events
 const consent = kafka.consumer({ groupId: 'gatekeeper-consent' });
 await consent.connect();
 await consent.subscribe({ topic: CONSENT_TOPIC, fromBeginning: true });
-consent
-  .run({
-    eachMessage: async ({ message }) => {
-      const evt = JSON.parse(message.value.toString());
-      const key = keyFor(evt.rp, evt.caseId, evt.citizenId);
-      if (evt.eventType === 'grant') {
-        consentStore.set(key, {
-          active: true,
-          scopes: new Set(evt.scopes || []),
-          expiresAt: evt.expiresAt
-        });
-        await replayBuffered(evt.rp, evt.caseId, evt.citizenId);
-      }
-      if (evt.eventType === 'revoke') {
-        consentStore.set(key, {
-          active: false,
-          scopes: new Set(),
-          expiresAt: new Date(0).toISOString()
-        });
-      }
-      console.log('[consent]', key, consentStore.get(key));
-    }
-  })
-  .catch((err) => {
-    console.error('[gatekeeper-consent] crash', err);
-    process.exit(1);
-  });
+runWithRetry('gatekeeper-consent', consent, async ({ message }) => {
+  const evt = JSON.parse(message.value.toString());
+  const key = keyFor(evt.rp, evt.caseId, evt.citizenId);
+  if (evt.eventType === 'grant') {
+    consentStore.set(key, {
+      active: true,
+      scopes: new Set(evt.scopes || []),
+      expiresAt: evt.expiresAt
+    });
+    await replayBuffered(evt.rp, evt.caseId, evt.citizenId);
+  }
+  if (evt.eventType === 'revoke') {
+    consentStore.set(key, {
+      active: false,
+      scopes: new Set(),
+      expiresAt: new Date(0).toISOString()
+    });
+  }
+  console.log('[consent]', key, consentStore.get(key));
+});
 
 // consume RAW and forward when permitted
 const raw = kafka.consumer({ groupId: 'gatekeeper-raw' });
 await raw.connect();
 await raw.subscribe({ topic: RAW_TOPIC, fromBeginning: true });
-raw
-  .run({
-    eachMessage: async ({ message }) => {
-      const event = JSON.parse(message.value.toString());
-      const caseId = CASE_BY_CITIZEN[event.patientId];
-      if (!caseId) return; // not part of the demo mapping
-      const minimal = {
-        patientId: event.patientId,
-        recordedAt: event.recordedAt,
-        prescription: {
-          drug: event.prescription.drug,
-          dose: event.prescription.dose,
-          repeats: event.prescription.repeats,
-          prescriber: event.prescription.prescriber
-        }
-      };
-      bufferRaw(event.patientId, minimal);
-      await forwardIfPermitted(caseId, event.patientId, minimal);
+runWithRetry('gatekeeper-raw', raw, async ({ message }) => {
+  const event = JSON.parse(message.value.toString());
+  const caseId = CASE_BY_CITIZEN[event.patientId];
+  if (!caseId) return; // not part of the demo mapping
+  const minimal = {
+    patientId: event.patientId,
+    recordedAt: event.recordedAt,
+    prescription: {
+      drug: event.prescription.drug,
+      dose: event.prescription.dose,
+      repeats: event.prescription.repeats,
+      prescriber: event.prescription.prescriber
     }
-  })
-  .catch((err) => {
-    console.error('[gatekeeper-raw] crash', err);
-    process.exit(1);
-  });
+  };
+  bufferRaw(event.patientId, minimal);
+  await forwardIfPermitted(caseId, event.patientId, minimal);
+});

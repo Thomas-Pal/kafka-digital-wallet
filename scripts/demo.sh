@@ -29,6 +29,20 @@ run_bg() {
 cd "$ROOT_DIR"
 
 echo "1) Bring up Kafka and Kafka UI"
+if ! command -v podman >/dev/null 2>&1; then
+  echo "podman is required for this demo. Install podman and podman-compose."
+  exit 1
+fi
+
+# On macOS podman needs the VM running; auto-start if it's stopped to avoid exit 125
+if command -v podman-machine >/dev/null 2>&1 || podman machine ls >/dev/null 2>&1; then
+  state=$(podman machine inspect --format '{{.State}}' 2>/dev/null || true)
+  if [ "$state" != "running" ]; then
+    echo "Starting podman machine (was: ${state:-unknown})..."
+    podman machine start
+  fi
+fi
+
 podman-compose up -d
 
 until podman exec kafka kafka-topics --bootstrap-server 127.0.0.1:29092 --list >/dev/null 2>&1; do
