@@ -15,6 +15,16 @@ const demoDecisions = [
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+async function seedIfNeeded() {
+  try {
+    const res = await fetch(`${consentServiceUrl}/api/demo/requests`, { method: 'POST' });
+    if (!res.ok) throw new Error(`seed failed: ${res.status}`);
+  } catch (err) {
+    // Not fatal; seeding is a convenience for demos.
+    console.warn('⚠️  could not seed demo requests (continuing):', err.message || err);
+  }
+}
+
 async function fetchPending() {
   const res = await fetch(`${consentServiceUrl}/api/requests`);
   if (!res.ok) throw new Error(`Failed to read pending requests: ${res.status}`);
@@ -37,6 +47,9 @@ async function submitDecision(decision) {
 async function run() {
   const maxAttempts = Number(process.env.MAX_ATTEMPTS || 40);
   const delayMs = Number(process.env.POLL_MS || 750);
+  const fallbackAfter = Number(process.env.FALLBACK_AFTER || 6);
+
+  await seedIfNeeded();
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
@@ -52,6 +65,19 @@ async function run() {
         if (match && !matchedPrefixes.has(match.correlationId)) {
           matchedPrefixes.add(match.correlationId);
           targets.push({ ...match, correlationId: req.correlationId });
+        }
+      }
+
+      if (!targets.length && pending.length && attempt >= fallbackAfter) {
+        console.log(
+          `ℹ️  no demo ID match after ${attempt} attempts; auto-approving ${pending.length} pending request(s)`
+        );
+        for (const req of pending) {
+          targets.push({
+            correlationId: req.correlationId,
+            decision: 'approved',
+            reason: 'Auto-approved for demo fallback'
+          });
         }
       }
 
