@@ -73,6 +73,8 @@ else
   fi
 fi
 
+DEMO_RUN_ID=$(date +%s)
+
 echo "[1/11] Stopping any previously running demo Node processes..."
 pkill -f 'consent-service.js' 2>/dev/null || true
 pkill -f 'consent-gatekeeper.js' 2>/dev/null || true
@@ -97,27 +99,27 @@ npm install
 
 # 5) Run consent dashboard (keeps UI available)
 echo "[5/11] Starting consent dashboard on http://localhost:3000 ..."
-KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run consent:service &
+DEMO_RUN_ID="$DEMO_RUN_ID" KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run consent:service &
 CONSENT_PID=$!
 wait_for_http "http://localhost:3000/healthz" "Consent dashboard"
 
 # 6) Run multi-topic consumer
 sleep 2
 echo "[6/11] Starting consumer for nhs + consent topics..."
-KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" TOPICS="nhs.raw.prescriptions,nhs.enriched.prescriptions,dwp.consent.requests,nhs.consent.decisions,nhs.audit.events" npm run consume &
+DEMO_RUN_ID="$DEMO_RUN_ID" KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" TOPICS="nhs.raw.prescriptions,nhs.enriched.prescriptions,dwp.consent.requests,nhs.consent.decisions,nhs.audit.events" npm run consume &
 CONSUMER_PID=$!
 
 # 7) Run consent gatekeeper (stream-table join)
 sleep 2
 echo "[7/11] Starting consent gatekeeper on http://localhost:3100/state ..."
-KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run consent:gatekeeper &
+DEMO_RUN_ID="$DEMO_RUN_ID" KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run consent:gatekeeper &
 GATEKEEPER_PID=$!
 wait_for_http "http://localhost:3100/state" "Consent gatekeeper"
 
 # 8) Run DWP portal (filtered view)
 sleep 2
 echo "[8/11] Starting DWP portal on http://localhost:4000 ..."
-KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run dwp:portal &
+DEMO_RUN_ID="$DEMO_RUN_ID" KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run dwp:portal &
 DWP_PORTAL_PID=$!
 wait_for_http "http://localhost:4000/healthz" "DWP portal"
 
@@ -136,11 +138,12 @@ echo "[11/11] Producing sample NHS prescriptions..."
 KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run produce:nhs
 
 echo "---"
-echo "Consent UI:   http://localhost:3000"
-echo "Gatekeeper:   http://localhost:3100/state"
-echo "DWP portal:   http://localhost:4000"
-echo "Kafka UI:     http://localhost:8080"
-echo "Kafka broker: 127.0.0.1:29092"
+echo "Consent UI:    http://localhost:3000"
+echo "Gatekeeper:    http://localhost:3100/state"
+echo "DWP portal:    http://localhost:4000"
+echo "Kafka UI:      http://localhost:8080"
+echo "Kafka broker:  127.0.0.1:29092"
+echo "Demo run ID:   ${DEMO_RUN_ID}" 
 echo "Press Ctrl+C to stop the consumer + consent service"
 
 trap 'echo "Stopping background services..."; kill $CONSUMER_PID $CONSENT_PID $GATEKEEPER_PID $DWP_PORTAL_PID 2>/dev/null || true' INT TERM

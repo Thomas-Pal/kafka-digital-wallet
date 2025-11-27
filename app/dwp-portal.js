@@ -8,7 +8,9 @@ const brokers = brokerConfig
   .filter(Boolean);
 
 const kafka = new Kafka({ brokers, logLevel: logLevel.NOTHING });
-const consumerGroup = process.env.DWP_CONSUMER_GROUP || 'dwp-portal';
+const baseGroup = process.env.DWP_CONSUMER_GROUP || 'dwp-portal';
+const demoRunId = process.env.DEMO_RUN_ID;
+const consumerGroup = demoRunId ? `${baseGroup}-${demoRunId}` : baseGroup;
 let consumer = kafka.consumer({ groupId: consumerGroup });
 
 const approvedTopic = process.env.DWP_APPROVED_TOPIC || 'dwp.filtered.prescriptions';
