@@ -35,7 +35,7 @@ async function submitDecision(decision) {
 }
 
 async function run() {
-  const maxAttempts = Number(process.env.MAX_ATTEMPTS || 15);
+  const maxAttempts = Number(process.env.MAX_ATTEMPTS || 40);
   const delayMs = Number(process.env.POLL_MS || 750);
 
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
@@ -45,6 +45,10 @@ async function run() {
       const targets = demoDecisions.filter((d) => pendingById.has(d.correlationId));
 
       if (!targets.length) {
+        const pendingIds = pending.map((p) => p.correlationId).join(', ');
+        console.log(
+          `⏳ waiting for demo requests (have=${pending.length ? pendingIds : 'none'}, attempt ${attempt}/${maxAttempts})`
+        );
         await sleep(delayMs);
         continue;
       }
