@@ -142,7 +142,6 @@ echo "[5/13] Starting consent dashboard on http://localhost:3000 ..."
 DEMO_RUN_ID="$DEMO_RUN_ID" KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run consent:service &
 CONSENT_PID=$!
 wait_for_http "http://localhost:3000/healthz" "Consent dashboard"
-wait_for_json_field_ge "http://localhost:3000/api/status" "kafkaReady" 1 "Consent dashboard (Kafka)"
 
 # 6) Run multi-topic consumer
 sleep 2
@@ -156,7 +155,6 @@ echo "[7/13] Starting consent gatekeeper on http://localhost:3100/state ..."
 DEMO_RUN_ID="$DEMO_RUN_ID" KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run consent:gatekeeper &
 GATEKEEPER_PID=$!
 wait_for_http "http://localhost:3100/healthz" "Consent gatekeeper"
-wait_for_json_field_ge "http://localhost:3100/state" "kafkaReady" 1 "Consent gatekeeper (Kafka)"
 
 # 8) Run DWP portal (filtered view)
 sleep 2
@@ -164,7 +162,6 @@ echo "[8/13] Starting DWP portal on http://localhost:4000 ..."
 DEMO_RUN_ID="$DEMO_RUN_ID" KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run dwp:portal &
 DWP_PORTAL_PID=$!
 wait_for_http "http://localhost:4000/healthz" "DWP portal"
-wait_for_json_field_ge "http://localhost:4000/api/state" "kafkaReady" 1 "DWP portal (Kafka)"
 
 # 9) Produce consent requests from DWP
 sleep 2
