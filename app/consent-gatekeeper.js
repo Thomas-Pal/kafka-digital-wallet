@@ -17,7 +17,7 @@ const approvedTopic = process.env.APPROVED_TOPIC || 'dwp.filtered.prescriptions'
 const blockedTopic = process.env.BLOCKED_TOPIC || 'dwp.blocked.prescriptions';
 
 const kafka = new Kafka({ brokers, logLevel: logLevel.NOTHING });
-const consumerGroup = process.env.GATEKEEPER_CONSUMER_GROUP || 'consent-gatekeeper';
+const consumerGroup = process.env.GATEKEEPER_CONSUMER_GROUP || `gatekeeper-${Date.now()}`;
 let consumer = kafka.consumer({ groupId: consumerGroup });
 let producer = kafka.producer();
 
