@@ -23,5 +23,5 @@ Or run the whole sequence (infra, topics, install, dashboard, consumer, gatekeep
 bash scripts/start-flow.sh   # requires Podman (podman machine up) or Docker running
 # consent UI at http://localhost:3000, Kafka UI at http://localhost:8080
 # DWP portal at http://localhost:4000 (filtered by consent via gatekeeper service)
-# Flow: the script publishes NHS prescriptions first (as if a GP visit already happened), then you send/approve consent from the portal/wallet to unlock the cached record for the DWP caseworker.
+# Flow: the script publishes NHS prescriptions first (as if a GP visit already happened), then you send/approve consent from the portal/wallet to unlock the cached record for the DWP caseworker. Sample GP events are produced for nhs-999, nhs-123, and nhs-777 so they match the caseworker buttons.
 ```

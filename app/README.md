@@ -48,7 +48,7 @@ This service performs a stream-table join: it builds an in-memory table of conse
 ```bash
 npm run produce:nhs
 ```
-This simulates the GP logging a prescription before DWP has asked for consent. The gatekeeper will hold the latest raw event per patient and evaluate it once consent arrives.
+This simulates the GP logging a prescription before DWP has asked for consent. The gatekeeper will hold the latest raw event per patient and evaluate it once consent arrives. Sample events are emitted for `nhs-999`, `nhs-123`, and `nhs-777` so they line up with the caseworker buttons in the portal.
 
 ## 7) Use the DWP caseworker portal to request consent
 Run `npm run dwp:portal` to open http://localhost:4000. Send a consent request for the patient, then switch to the wallet UI to approve or reject access (and set the retention). When an approval arrives, the gatekeeper replays the cached raw prescription into `dwp.filtered.prescriptions`; rejections keep the record in `dwp.blocked.prescriptions`.
