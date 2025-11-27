@@ -32,33 +32,22 @@ const latestPrescriptionByPatient = new Map();
 let approvedCount = 0;
 let blockedCount = 0;
 
-const upsertConsent = (decision) => {
-  if (!decision?.patientId) return;
-  consentByPatient.set(decision.patientId, decision);
+const emitApproved = async (event, consent) => {
+  approvedCount += 1;
+  await producer.send({
+    topic: approvedTopic,
+    messages: [
+      {
+        key: event.patientId,
+        value: JSON.stringify({ ...event, consentDecision: consent })
+      }
+    ]
+  });
 };
 
-const evaluatePrescription = async (event) => {
-  if (!event?.patientId) return;
-
-  latestPrescriptionByPatient.set(event.patientId, event);
-  const consent = consentByPatient.get(event.patientId);
-
-  if (consent?.decision === 'approved') {
-    approvedCount += 1;
-    await producer.send({
-      topic: approvedTopic,
-      messages: [
-        {
-          key: event.patientId,
-          value: JSON.stringify({ ...event, consentDecision: consent })
-        }
-      ]
-    });
-    return;
-  }
-
+const emitRejected = async (event, consent) => {
   blockedCount += 1;
-  const reason = consent?.decision === 'rejected' ? 'rejected by citizen' : 'no consent yet';
+  const reason = consent?.reason || 'rejected by citizen';
   await producer.send({
     topic: blockedTopic,
     messages: [
@@ -68,6 +57,43 @@ const evaluatePrescription = async (event) => {
       }
     ]
   });
+};
+
+const upsertConsent = async (decision) => {
+  if (!decision?.patientId) return;
+  consentByPatient.set(decision.patientId, decision);
+
+  const cached = latestPrescriptionByPatient.get(decision.patientId);
+  if (!cached) return;
+
+  if (decision.decision === 'approved') {
+    await emitApproved(cached, decision);
+    console.log('🔁 replayed cached prescription for', decision.patientId, 'after approval');
+  } else if (decision.decision === 'rejected') {
+    await emitRejected(cached, decision);
+    console.log('🚫 emitted blocked record for', decision.patientId, 'after rejection');
+  }
+};
+
+const evaluatePrescription = async (event) => {
+  if (!event?.patientId) return;
+
+  latestPrescriptionByPatient.set(event.patientId, event);
+  const consent = consentByPatient.get(event.patientId);
+
+  if (!consent) {
+    console.log('⏸️  holding prescription for', event.patientId, 'until consent decision arrives');
+    return;
+  }
+
+  if (consent.decision === 'approved') {
+    await emitApproved(event, consent);
+    return;
+  }
+
+  if (consent.decision === 'rejected') {
+    await emitRejected(event, consent);
+  }
 };
 
 const resetConsumer = async () => {
@@ -88,9 +114,9 @@ async function startKafka() {
     await consumer.connect();
 
     for (const topic of consentTopics) {
-      await consumer.subscribe({ topic, fromBeginning: true });
+      await consumer.subscribe({ topic, fromBeginning: false });
     }
-    await consumer.subscribe({ topic: prescriptionTopic, fromBeginning: true });
+    await consumer.subscribe({ topic: prescriptionTopic, fromBeginning: false });
 
     kafkaReady = true;
     lastKafkaError = null;
@@ -103,15 +129,8 @@ async function startKafka() {
           const payload = JSON.parse(raw);
 
           if (consentTopics.includes(topic)) {
-            upsertConsent(payload);
+            await upsertConsent(payload);
             console.log('📥 consent cache updated for', payload.patientId, payload.decision);
-            if (payload.decision === 'approved') {
-              const cached = latestPrescriptionByPatient.get(payload.patientId);
-              if (cached) {
-                await evaluatePrescription(cached);
-                console.log('🔁 replayed cached prescription for', payload.patientId, 'after approval');
-              }
-            }
             return;
           }
 

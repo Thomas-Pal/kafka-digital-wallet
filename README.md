@@ -25,3 +25,5 @@ bash scripts/start-flow.sh   # requires Podman (podman machine up) or Docker run
 # DWP portal at http://localhost:4000 (filtered by consent via gatekeeper service)
 # Flow: the script publishes NHS prescriptions first (as if a GP visit already happened), then you send/approve consent from the portal/wallet to unlock the cached record for the DWP caseworker. Sample GP events are produced for nhs-999, nhs-123, and nhs-777 so they match the caseworker buttons.
 ```
+
+The DWP filtered view intentionally starts empty: the gatekeeper now withholds publishing until a consent decision is received. Approvals replay the cached NHS prescription into `dwp.filtered.prescriptions`, and explicit rejections are the only time a record appears in `dwp.blocked.prescriptions`.
