@@ -14,6 +14,8 @@ const consumerGroup = demoRunId ? `${baseGroup}-${demoRunId}` : baseGroup;
 let consumer = kafka.consumer({ groupId: consumerGroup });
 const producer = kafka.producer();
 
+const walletBaseUrl = process.env.WALLET_BASE_URL || 'http://localhost:3000';
+
 const approvedTopic = process.env.DWP_APPROVED_TOPIC || 'dwp.filtered.prescriptions';
 const blockedTopic = process.env.DWP_BLOCKED_TOPIC || 'dwp.blocked.prescriptions';
 const consentRequestTopic = process.env.DWP_CONSENT_TOPIC || 'dwp.consent.requests';
@@ -360,6 +362,23 @@ const recordRequest = (request) => {
   if (sentRequests.length > maxRows.requests) sentRequests.pop();
 };
 
+const notifyWallet = async (request) => {
+  try {
+    const res = await fetch(`${walletBaseUrl}/api/requests`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(request)
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      throw new Error(`Wallet responded with ${res.status}: ${text}`);
+    }
+  } catch (err) {
+    console.error('Wallet did not accept the consent request yet', err);
+  }
+};
+
 const upsertConsent = (decision) => {
   if (!decision?.patientId) return;
   consentByPatient.set(decision.patientId, decision);
@@ -463,6 +482,7 @@ const sendConsentRequest = async (request) => {
   });
 
   recordRequest(payload);
+  await notifyWallet(payload);
   console.log('📨 sent consent request for', payload.patientId, 'to topic', consentRequestTopic);
   return payload;
 };

@@ -346,6 +346,17 @@ const startService = async () => {
     res.json({ status: statusSnapshot(), requests: pendingRequests, decisions })
   );
   app.get('/api/requests', (_req, res) => res.json(pendingRequests));
+  app.post('/api/requests', (req, res) => {
+    const { correlationId, patientId, purpose, requestingSystem, retention, requestedAt } = req.body || {};
+    if (!correlationId || !patientId || !purpose) {
+      return res
+        .status(400)
+        .json({ error: 'correlationId, patientId, and purpose are required to record a consent request' });
+    }
+
+    upsertRequest({ correlationId, patientId, purpose, requestingSystem, retention, requestedAt });
+    return res.json({ ok: true });
+  });
   app.get('/api/decisions', (_req, res) => res.json(decisions));
   app.get('/api/audit', (_req, res) => res.json(auditTrail));
   app.post('/api/decisions', async (req, res) => {
