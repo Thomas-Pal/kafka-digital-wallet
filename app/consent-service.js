@@ -20,30 +20,6 @@ const pendingRequests = [];
 const decisions = [];
 const auditTrail = [];
 
-const demoRequests = [
-  {
-    correlationId: 'req-1001',
-    requestingSystem: 'DWP-benefits-gateway',
-    purpose: 'benefit-eligibility-check',
-    patientId: 'nhs-999',
-    retention: '6 months'
-  },
-  {
-    correlationId: 'req-1002',
-    requestingSystem: 'DWP-risk-analytics',
-    purpose: 'fraud-prevention',
-    patientId: 'nhs-123',
-    retention: '3 months'
-  },
-  {
-    correlationId: 'req-1003',
-    requestingSystem: 'DWP-risk-analytics',
-    purpose: 'fraud-prevention',
-    patientId: 'nhs-777',
-    retention: '3 months'
-  }
-];
-
 const upsertRequest = (request) => {
   if (!request?.correlationId) return;
 
@@ -133,11 +109,6 @@ const renderDashboard = () => `
       <strong id="status-text">Connecting to Kafka…</strong>
     </div>
 
-    <div class="spacer">
-      <button id="inject-demo" class="secondary">Inject demo requests</button>
-      <span class="muted">Add sample consent requests if nothing is flowing.</span>
-    </div>
-
     <div class="grid">
       <section>
         <h2>Incoming requests</h2>
@@ -154,7 +125,7 @@ const renderDashboard = () => `
           </thead>
           <tbody id="requests-body"></tbody>
         </table>
-        <div class="spacer muted" id="requests-empty">Waiting for requests… run the DWP producer to see rows arrive.</div>
+        <div class="spacer muted" id="requests-empty">Waiting for requests… send one from the DWP caseworker portal.</div>
       </section>
 
       <section>
@@ -191,7 +162,6 @@ const renderDashboard = () => `
       const decisionsEmpty = document.getElementById('decisions-empty');
       const statusBox = document.getElementById('status');
       const statusText = document.getElementById('status-text');
-      const injectDemo = document.getElementById('inject-demo');
 
       const setStatus = (state, text) => {
         statusBox.dataset.state = state;
@@ -206,7 +176,7 @@ const renderDashboard = () => `
 
       const applyStatus = (status) => {
         const suffix = status.pendingCount === 0 && status.decisionsCount === 0
-          ? ' — waiting for requests (or use demo injector).'
+          ? ' — waiting for requests from a data consumer.'
           : '';
 
         if (status.kafkaReady) {
@@ -245,15 +215,6 @@ const renderDashboard = () => `
           '</td>',
           '</tr>'
         ].join('');
-
-      injectDemo?.addEventListener('click', async () => {
-        try {
-          await fetch('/api/demo/requests', { method: 'POST' });
-          await refresh();
-        } catch (err) {
-          console.error('Failed to seed demo requests', err);
-        }
-      });
 
       const sendDecision = async (correlationId, decision) => {
         try {
@@ -368,33 +329,6 @@ const statusSnapshot = () => ({
   lastKafkaError
 });
 
-const seedDemo = async () => {
-  const now = Date.now();
-  const entries = demoRequests.map((req, idx) => ({
-    ...req,
-    correlationId: `${req.correlationId}-${now}-${idx}`,
-    requestedAt: new Date().toISOString()
-  }));
-
-  for (const entry of entries) {
-    upsertRequest(entry);
-  }
-
-  if (kafkaReady) {
-    try {
-      await producer.send({
-        topic: 'dwp.consent.requests',
-        messages: entries.map((req) => ({ key: req.patientId, value: JSON.stringify(req) }))
-      });
-      console.log('🧪 seeded demo consent requests into Kafka');
-    } catch (err) {
-      console.error('Failed to seed demo requests into Kafka', err);
-    }
-  } else {
-    console.log('🧪 demo requests added locally (Kafka not connected yet)');
-  }
-};
-
 const startService = async () => {
   const app = express();
   app.use(express.json());
@@ -463,11 +397,6 @@ const startService = async () => {
 
     console.log('✅ user decision captured', decisionRecord.patientId, decisionRecord.decision);
     res.json(decisionRecord);
-  });
-
-  app.post('/api/demo/requests', async (_req, res) => {
-    await seedDemo();
-    res.json({ status: 'ok', count: pendingRequests.length });
   });
 
   app.get('/', (_req, res) => res.send(renderDashboard()));

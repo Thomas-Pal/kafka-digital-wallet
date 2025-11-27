@@ -35,7 +35,7 @@ npm run consent:service
 # UI/API at http://localhost:3000
 ```
 Consumes DWP requests, queues them for wallet approval, and publishes citizen decisions to `nhs.consent.decisions` plus audit entries to `nhs.audit.events`. The dashboard auto-refreshes every few seconds and shows a waiting state until requests arrive.
-Use the "Inject demo requests" button if you want to bypass the DWP portal and populate the wallet queue for testing.
+Send consent requests from the DWP portal to populate the wallet queue for testing.
 
 ## 5) Start the consent gatekeeper (Kafka Streams-style join)
 ```bash
@@ -62,7 +62,7 @@ This brings up Kafka, creates topics, installs Node deps, and starts the consent
 
 ## Expected
 * Producer logs show RAW + ENRICHED prescription events.
-* Wallet UI lists pending DWP requests until you approve or reject them; you can still inject demo requests if you need a shortcut.
+* Wallet UI lists pending DWP requests until you approve or reject them.
 * DWP portal shows blocked records until consent arrives, then replays the stored prescription for approved patients into the filtered view.
 * Consent service logs `✅ user decision captured ...` once you take action from the wallet.
 * Consumer displays traffic across all configured topics.
