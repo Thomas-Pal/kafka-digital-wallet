@@ -1,151 +1,67 @@
-import { Kafka, Partitioners } from 'kafkajs';
-import { BROKERS, RAW_TOPIC, CONSENT_TOPIC, VIEW_TOPIC, CASE_BY_CITIZEN } from './config.js';
+import { Kafka } from 'kafkajs';
+import { BROKERS, RAW_TOPIC, CONSENT_TOPIC, viewTopic } from './config.js';
 
-const kafka = new Kafka({ brokers: BROKERS });
-const admin = kafka.admin();
-const consentStore = new Map(); // key: rp|case|citizen -> {active, scopes, expiresAt}
-const rawBuffer = new Map(); // citizenId -> minimal RAW events kept for replay when consent arrives
-const keyFor = (rp, caseId, citizenId) => `${rp}|${caseId}|${citizenId}`;
-
-const bufferRaw = (citizenId, minimalEvent) => {
-  const current = rawBuffer.get(citizenId) || [];
-  current.push(minimalEvent);
-  // keep last 20 per citizen for a quick backfill when consent is granted
-  if (current.length > 20) current.shift();
-  rawBuffer.set(citizenId, current);
-};
-
-const ensureViewTopic = async (topic) => {
-  try {
-    await admin.createTopics({
-      topics: [
-        {
-          topic,
-          configEntries: [{ name: 'retention.ms', value: String(7 * 24 * 60 * 60 * 1000) }]
-        }
-      ],
-      waitForLeaders: true
-    });
-  } catch (err) {
-    if (!/Topic '.+' already exists/.test(err.message)) {
-      console.warn('[gatekeeper] ensureViewTopic warn', err.message);
-    }
-  }
-};
-
-const forwardIfPermitted = async (caseId, citizenId, minimal) => {
-  const key = keyFor('dwp', caseId, citizenId);
-  const consentEntry = consentStore.get(key);
-  if (!consentEntry) {
-    console.log('[gatekeeper] skip - no consent', key);
-    return;
-  }
-  if (!consentEntry.active) {
-    console.log('[gatekeeper] skip - consent inactive', key);
-    return;
-  }
-  if (new Date(consentEntry.expiresAt) < new Date()) {
-    console.log('[gatekeeper] skip - consent expired', key);
-    return;
-  }
-  if (!consentEntry.scopes.has('prescriptions')) {
-    console.log('[gatekeeper] skip - scope missing', key);
-    return;
-  }
-
-  const viewTopic = VIEW_TOPIC(caseId, citizenId);
-  await ensureViewTopic(viewTopic);
-  await producer.send({
-    topic: viewTopic,
-    messages: [{ key: citizenId, value: JSON.stringify(minimal), headers: { rp: 'dwp', case_id: caseId } }]
-  });
-  console.log('[view]', viewTopic, '→', citizenId, minimal.prescription.drug);
-};
-
-const replayBuffered = async (rp, caseId, citizenId) => {
-  if (rp !== 'dwp') return; // demo assumes DWP relying party
-  const buffered = rawBuffer.get(citizenId) || [];
-  for (const minimal of buffered) {
-    await forwardIfPermitted(caseId, citizenId, minimal);
-  }
-};
-
-const producer = kafka.producer({ createPartitioner: Partitioners.LegacyPartitioner });
-const RUN_ID = process.env.RUN_ID || `${Date.now()}`;
-
-const waitForKafka = async () => {
-  await admin.connect();
-  let ready = false;
-  while (!ready) {
-    try {
-      await admin.fetchTopicMetadata({ topics: [RAW_TOPIC, CONSENT_TOPIC] });
-      ready = true;
-    } catch (err) {
-      console.warn('[gatekeeper] waiting for Kafka...', err.message);
-      await new Promise((r) => setTimeout(r, 1000));
-    }
-  }
-};
-
-await waitForKafka();
+const k = new Kafka({ brokers: BROKERS });
+const producer = k.producer();
 await producer.connect();
 
-const runWithRetry = async (label, consumer, handler) => {
-  // simple forever loop to handle transient coordinator/metadata errors
-  while (true) {
-    try {
-      await consumer.run({ eachMessage: handler });
-    } catch (err) {
-      console.error(`[${label}] restart in 2s`, err.message);
-      await new Promise((r) => setTimeout(r, 2000));
+// key: "rp|case|citizen" -> { active, scopes:Set, expiresAt }
+const consentStore = new Map();
+const keyFor = (rp, caseId, citizenId) => `${rp}|${caseId}|${citizenId}`;
+
+// citizenId -> Set(caseId) for RP 'dwp'
+const grantsByCitizen = new Map();
+
+// consume consent
+const consent = k.consumer({ groupId:'gatekeeper-consent' });
+await consent.connect();
+await consent.subscribe({ topic: CONSENT_TOPIC, fromBeginning:true });
+consent.run({
+  eachMessage: async ({ message }) => {
+    const evt = JSON.parse(message.value.toString());
+    if (evt.rp !== 'dwp') return; // demo scope
+    const key = keyFor(evt.rp, evt.caseId, evt.citizenId);
+
+    if (evt.eventType === 'grant') {
+      consentStore.set(key, { active:true, scopes:new Set(evt.scopes||[]), expiresAt:evt.expiresAt });
+      const s = grantsByCitizen.get(evt.citizenId) || new Set();
+      s.add(evt.caseId); grantsByCitizen.set(evt.citizenId, s);
+      console.log('[consent] grant', key);
+    } else if (evt.eventType === 'revoke') {
+      consentStore.set(key, { active:false, scopes:new Set(), expiresAt:new Date(0).toISOString() });
+      const s = grantsByCitizen.get(evt.citizenId) || new Set();
+      s.delete(evt.caseId); grantsByCitizen.set(evt.citizenId, s);
+      console.log('[consent] revoke', key);
+    } else if (evt.eventType === 'request') {
+      console.log('[consent] request', key);
     }
   }
-};
-
-// consume consent events
-const consent = kafka.consumer({ groupId: `gatekeeper-consent-${RUN_ID}` });
-await consent.connect();
-await consent.subscribe({ topic: CONSENT_TOPIC, fromBeginning: true });
-runWithRetry('gatekeeper-consent', consent, async ({ message }) => {
-  const evt = JSON.parse(message.value.toString());
-  const key = keyFor(evt.rp, evt.caseId, evt.citizenId);
-  if (evt.eventType === 'grant') {
-    consentStore.set(key, {
-      active: true,
-      scopes: new Set(evt.scopes || []),
-      expiresAt: evt.expiresAt
-    });
-    await replayBuffered(evt.rp, evt.caseId, evt.citizenId);
-  }
-  if (evt.eventType === 'revoke') {
-    consentStore.set(key, {
-      active: false,
-      scopes: new Set(),
-      expiresAt: new Date(0).toISOString()
-    });
-  }
-  console.log('[consent]', key, consentStore.get(key));
 });
 
-// consume RAW and forward when permitted
-const raw = kafka.consumer({ groupId: `gatekeeper-raw-${RUN_ID}` });
+// consume RAW and forward if permitted
+const raw = k.consumer({ groupId:'gatekeeper-raw' });
 await raw.connect();
-await raw.subscribe({ topic: RAW_TOPIC, fromBeginning: true });
-runWithRetry('gatekeeper-raw', raw, async ({ message }) => {
-  const event = JSON.parse(message.value.toString());
-  const caseId = CASE_BY_CITIZEN[event.patientId];
-  if (!caseId) return; // not part of the demo mapping
-  const minimal = {
-    patientId: event.patientId,
-    recordedAt: event.recordedAt,
-    prescription: {
-      drug: event.prescription.drug,
-      dose: event.prescription.dose,
-      repeats: event.prescription.repeats,
-      prescriber: event.prescription.prescriber
+await raw.subscribe({ topic: RAW_TOPIC, fromBeginning:true });
+
+raw.run({
+  eachMessage: async ({ message }) => {
+    const e = JSON.parse(message.value.toString()); // { patientId, recordedAt, prescription:{...} }
+    const cases = grantsByCitizen.get(e.patientId) || new Set();
+    if (cases.size === 0) return; // no active grants for this citizen
+
+    for (const caseId of cases) {
+      const key = keyFor('dwp', caseId, e.patientId);
+      const c = consentStore.get(key);
+      if (!c || !c.active || new Date(c.expiresAt) < new Date() || !c.scopes.has('prescriptions')) continue;
+
+      const minimal = {
+        patientId: e.patientId,
+        recordedAt: e.recordedAt,
+        prescription: { drug: e.prescription.drug, dose: e.prescription.dose, repeats: e.prescription.repeats, prescriber: e.prescription.prescriber }
+      };
+      const topic = viewTopic(caseId, e.patientId);
+      await producer.send({ topic, messages:[{ key:e.patientId, value: JSON.stringify(minimal), headers:{ rp:'dwp', case_id:caseId } }] });
+      console.log('[view]', topic, '→', e.patientId, minimal.prescription.drug);
     }
-  };
-  bufferRaw(event.patientId, minimal);
-  console.log('[raw]', event.patientId, minimal.prescription.drug);
-  await forwardIfPermitted(caseId, event.patientId, minimal);
+  }
 });

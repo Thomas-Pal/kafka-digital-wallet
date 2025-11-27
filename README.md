@@ -1,110 +1,36 @@
-# GOV.UK-style consent-filtered Kafka PoC
+# GOV Wallet Consent Demo — One-Hit
 
-Stakeholder demo script (non-technical): a GP logs a prescription; the event lands in the secure backbone. A DWP caseworker asks the citizen for permission to see **only** their prescriptions for this case. The citizen taps “Allow for 3 months” in a friendly GOV.UK-style screen. Instantly, a filtered feed appears in the DWP portal with only the citizen’s prescriptions and only for the approved window. If consent is revoked, the feed dries up and historical data ages out automatically.
-
-## Repo layout
-```
-gov-wallet-consent-poc/
-├─ podman-compose.yml
-├─ scripts/
-│  ├─ topics-create.sh
-│  ├─ topics-list.sh
-│  ├─ seed.sh
-│  └─ demo.sh
-├─ services/
-│  ├─ package.json
-│  ├─ mock-nhs-producer.js            # RAW producer
-│  ├─ mock-consent-api.js             # tiny REST to issue consent events
-│  ├─ gatekeeper.js                   # RAW+consent -> VIEW
-│  ├─ dwp-consumer.js                 # prints/serves VIEW to portal and case list
-│  └─ config.js
-├─ wallet-ui/                         # Vite React app (GOV.UK-style consent screen)
-│  ├─ index.html
-│  ├─ src/
-│  │  ├─ main.tsx
-│  │  ├─ App.tsx
-│  │  └─ govuk.css
-│  └─ package.json
-├─ dwp-portal/                        # Vite React app showing filtered stream per case
-│  ├─ index.html
-│  ├─ src/
-│  │  ├─ main.tsx
-│  │  └─ App.tsx
-│  └─ package.json
-└─ README.md
-```
-
-Kafka infra (Podman): `podman-compose.yml` spins up a single KRaft broker (PLAINTEXT, listeners on 9092/29092) and Kafka UI on :8080.
-
-Prereqs: Podman + podman-compose (or Docker + compose) and `jq` available on your PATH.
-
-**Topics & retention**
-- RAW: `nhs.raw.prescriptions` (keyed by patientId)
-- CONSENT: `consent.events` (grants/revokes)
-- VIEW (per case/citizen): `views.permitted.dwp.<caseId>.<citizenId>` with `retention.ms=604800000` (7 days) — created on demand when consent is active.
-
-## One-hit demo runner (preferred)
-This brings everything up, seeds RAW events, and leaves you to click Allow/Revoke in the wallet while the portal updates. On macOS, it will auto-start the Podman machine if it's stopped — and will create the default machine if you haven't run `podman machine init` yet — to avoid the “exit status 125” error.
+Run:
 ```bash
-bash scripts/demo.sh
-# logs land in ./logs/*.log; Ctrl+C stops background services started by the script
+chmod +x demo.sh scripts/*.sh
+./demo.sh
 ```
 
-If you can still reach Kafka UI at http://localhost:8080 but Podman Desktop shows **no containers**, it usually means Kafka is running from another engine (for example Docker) or your Podman machine never started. Either stop the other engine or let `scripts/demo.sh` create/start `podman-machine-default` so the compose stack has somewhere to run.
+Flow:
 
-If consent seems stuck, check `./logs/consent-api.log`, `./logs/gatekeeper.log`, and `./logs/dwp-api.log`: the consent API now retries until Kafka is reachable and logs any publish errors; the gatekeeper logs why it skips RAW events (no consent, inactive/expired, missing scope) and the DWP API waits for Kafka before subscribing so VIEW messages appear as soon as consent is granted.
+Starts Kafka + UI, creates topics.
 
-## Manual steps (if you prefer)
-1) Start Kafka + UI
-```bash
-podman-compose up -d   # or: docker compose -f podman-compose.yml up -d
-```
-2) Create demo topics
-```bash
-bash scripts/topics-create.sh   # only RAW + CONSENT are created; VIEW topics are created by gatekeeper when consent is active
-```
-3) Install dependencies
-```bash
-(cd services && npm install)
-(cd wallet-ui && npm install)
-(cd dwp-portal && npm install)
-```
-4) Start backends (3 terminals)
-```bash
-cd services
-npm run consent-api   # :4000 REST to emit consent events
-npm run gatekeeper    # RAW+consent -> VIEW (per-case)
-npm run dwp           # consumes VIEW and serves :5001 (cases + views)
-```
-5) Start UIs (2 terminals)
-```bash
-(cd wallet-ui && npm run dev -- --host --port 5173)   # http://localhost:5173 wallet consent screen
-(cd dwp-portal && npm run dev -- --host --port 5174)  # http://localhost:5174 DWP portal (case list)
-```
-6) Publish some RAW prescriptions
-```bash
-bash scripts/seed.sh
-# or manually: (cd services && npm run produce:nhs)
-```
-7) In the DWP portal, click **Send consent request** on a case card. The wallet stays empty until this request arrives.
-8) In the wallet UI, respond to the request (Allow/Stop sharing). Gatekeeper will immediately backfill recent RAW prescriptions and stream future ones to the matching VIEW topic for that case/citizen.
-9) Click **Revoke** (or POST /consent/revoke) to stop new VIEW events; after 7 days retention the VIEW topic empties.
+Starts Consent API, Gatekeeper, DWP Service; starts Wallet UI and DWP Portal.
 
-## Troubleshooting (fast fixes)
-- **Advertised listeners**: all Node apps use `127.0.0.1:29092` matching `KAFKA_ADVERTISED_LISTENERS`.
-- **Topics**: rerun `scripts/topics-create.sh` if producers/consumers disagree on names.
-- **Offsets**: consumers now append a `RUN_ID` (default: current timestamp) to their `groupId` so every demo run re-reads RAW and CONSENT from the start. Set `RUN_ID=demo1` on all services if you want them aligned while still forcing a fresh read.
-- **Consent flow**: gatekeeper subscribes to both RAW and `consent.events`; DWP reads only VIEW topics.
-- **Dynamic VIEW topics**: DWP subscribes via regex (`views.permitted.dwp.*`) so new VIEW topics created on consent are picked up automatically; you no longer need placeholder VIEW topics.
-- **CORS**: mock services send permissive headers so Vite dev servers can call them directly.
-- **Broker not ready / coordinator errors**: gatekeeper and DWP consumers auto-retry if the broker isn't ready yet, so leave them running while Podman finishes bringing Kafka up.
+Sends consent request (case 9001 → citizen nhs-999).
 
-## Architecture beat-by-beat (what we show live)
-- **NHS event published**: “Prescription issued for Joe” arrives in RAW (red) topic.
-- **Caseworker requests access**: Case card shows “consent request sent”; a consent request appears in the wallet (mobile-style UI).
-- **Citizen approves**: The consent event (purple) is recorded.
-- **Gatekeeper enforces consent**: A VIEW (green) stream is created for DWP/this case/this citizen only.
-- **DWP portal updates**: Caseworker sees only Joe’s prescriptions, minimal fields, per-case list with status chips.
-- **Revoke**: Citizen revokes consent; the VIEW stops receiving new events and data ages out automatically.
+You approve in wallet.
 
-Quality bar: topic names contain no PII, minimal payload in VIEW, 7-day retention, wallet-first consent UX, DWP never reads RAW.
+Script then publishes RAW so the VIEW fills instantaneously.
+
+URLs:
+
+Wallet: http://localhost:5173
+
+DWP Portal: http://localhost:5174
+
+Kafka UI: http://localhost:8080
+
+Consent API: http://localhost:4000
+
+DWP API: http://localhost:5001
+
+After creating the repo, also run:
+```bash
+chmod +x demo.sh scripts/*.sh
+```

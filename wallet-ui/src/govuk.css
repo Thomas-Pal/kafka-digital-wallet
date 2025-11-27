@@ -1,37 +1,7 @@
-:root {
-  color: #0b0c0c;
-  background-color: #f3f2f1;
-  font-family: 'GDS Transport', 'Segoe UI', system-ui, -apple-system, sans-serif;
-}
-
-body {
-  margin: 0;
-  background: #f3f2f1;
-}
-
-button {
-  cursor: pointer;
-  font-size: 16px;
-  border-radius: 4px;
-}
-
-a {
-  color: #1d70b8;
-  font-weight: 600;
-  text-decoration: none;
-}
-
-a:hover {
-  text-decoration: underline;
-}
-
-.table-lite {
-  border-collapse: collapse;
-  width: 100%;
-}
-
-.table-lite th,
-.table-lite td {
-  border-bottom: 1px solid #b1b4b6;
-  padding: 8px 0;
-}
+body { font-family: system-ui, sans-serif; margin:0; padding:0 16px; background:#fff; color:#0b0c0c; }
+h1 { font-size: 32px; margin: 24px 0 8px; }
+.gov-box { border:3px solid #1d70b8; padding:20px; border-radius:8px; background:#f3f2f1; }
+.btn-allow { background:#00703c; color:#fff; padding:12px 20px; border:0; font-weight:700; cursor:pointer; }
+.btn-revoke { background:#d4351c; color:#fff; padding:12px 20px; border:0; font-weight:700; cursor:pointer; }
+.request { background:#fff; border:2px solid #b1b4b6; padding:12px; border-radius:6px; margin-top:10px; }
+small { color:#505a5f; }

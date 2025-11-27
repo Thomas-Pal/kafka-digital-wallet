@@ -1,8 +1,18 @@
-{ "name":"services","version":"1.0.0","type":"module","private":true,
-  "dependencies":{"kafkajs":"^2.2.4","express":"^4","uuid":"^9"},
-  "scripts":{
-    "produce:nhs":"node mock-nhs-producer.js",
-    "consent-api":"node mock-consent-api.js",
-    "gatekeeper":"node gatekeeper.js",
-    "dwp":"node dwp-consumer.js"
-  }}
+{
+  "name": "services",
+  "version": "1.0.0",
+  "type": "module",
+  "private": true,
+  "dependencies": {
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "kafkajs": "^2.2.4",
+    "uuid": "^9.0.1"
+  },
+  "scripts": {
+    "consent-api": "node mock-consent-api.js",
+    "gatekeeper": "node gatekeeper.js",
+    "dwp": "node dwp-service.js",
+    "produce:nhs": "node mock-nhs-producer.js"
+  }
+}
