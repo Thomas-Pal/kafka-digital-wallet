@@ -50,6 +50,8 @@ bash scripts/demo.sh
 # logs land in ./logs/*.log; Ctrl+C stops background services started by the script
 ```
 
+If you can still reach Kafka UI at http://localhost:8080 but Podman Desktop shows **no containers**, it usually means Kafka is running from another engine (for example Docker) or your Podman machine never started. Either stop the other engine or let `scripts/demo.sh` create/start `podman-machine-default` so the compose stack has somewhere to run.
+
 ## Manual steps (if you prefer)
 1) Start Kafka + UI
 ```bash

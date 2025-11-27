@@ -53,6 +53,8 @@ if [[ "$(uname -s)" == "Darwin" ]] && podman machine ls >/dev/null 2>&1; then
       echo "podman machine init failed; is your podman installation healthy?"
       exit 1
     fi
+    echo "Starting podman-machine-default after init..."
+    podman machine start podman-machine-default
   else
     state=$(podman machine inspect --format '{{.State}}' podman-machine-default 2>/dev/null || true)
     if [ "$state" != "running" ]; then
