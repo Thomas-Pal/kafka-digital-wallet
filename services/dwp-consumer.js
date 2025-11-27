@@ -1,6 +1,6 @@
 import { Kafka, logLevel } from 'kafkajs';
 import express from 'express';
-import { BROKERS, VIEW_TOPIC, CONSENT_TOPIC, DEMO_CASES } from './config.js';
+import { BROKERS, VIEW_TOPIC, CONSENT_TOPIC, DEMO_CASES, CONSENT_API_URL } from './config.js';
 
 const app = express();
 app.use((_, res, next) => {
@@ -94,6 +94,11 @@ app.post('/api/case/:caseId/request-consent', (req, res) => {
   current.consentStatus = 'requested';
   current.lastConsentEvent = new Date().toISOString();
   cases.set(req.params.caseId, { ...current });
+  fetch(`${CONSENT_API_URL}/consent/request`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({ rp: current.rp, caseId: current.caseId, citizenId: current.citizenId })
+  }).catch((err) => console.error('Failed to notify consent service of request', err));
   res.json({ ok: true, caseId: req.params.caseId, status: current.consentStatus });
 });
 

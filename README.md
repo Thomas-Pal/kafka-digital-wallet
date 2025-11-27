@@ -75,14 +75,15 @@ npm run dwp           # consumes VIEW and serves :5001 (cases + views)
 (cd wallet-ui && npm run dev -- --host --port 5173)   # http://localhost:5173 wallet consent screen
 (cd dwp-portal && npm run dev -- --host --port 5174)  # http://localhost:5174 DWP portal (case list)
 ```
-6) Publish some RAW prescriptions and grant consent
+6) Publish some RAW prescriptions
 ```bash
 bash scripts/seed.sh
 # or manually: (cd services && npm run produce:nhs)
 ```
-7) In the wallet UI, click **Allow** (posts to :4000). The gatekeeper will begin emitting to `views.permitted.dwp.<caseId>.<citizenId>`
+7) In the DWP portal, click **Send consent request** on a case card. The wallet status will change from “not requested” to “requested”.
+8) In the wallet UI, click **Allow** (posts to :4000). The gatekeeper will begin emitting to `views.permitted.dwp.<caseId>.<citizenId>`
    and the DWP portal cards show the consent request indicator turning into ✅ Granted as filtered rows appear when permitted.
-8) Click **Revoke** (or POST /consent/revoke) to stop new VIEW events; after 7 days retention the VIEW topic empties.
+9) Click **Revoke** (or POST /consent/revoke) to stop new VIEW events; after 7 days retention the VIEW topic empties.
 
 ## Troubleshooting (fast fixes)
 - **Advertised listeners**: all Node apps use `127.0.0.1:29092` matching `KAFKA_ADVERTISED_LISTENERS`.
