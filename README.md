@@ -22,4 +22,5 @@ Or run the whole sequence (infra, topics, install, dashboard, consumer, producer
 bash scripts/start-flow.sh   # requires Podman (podman machine up) or Docker running
 # consent UI at http://localhost:3000, Kafka UI at http://localhost:8080
 # DWP portal at http://localhost:4000 (filtered by consent via gatekeeper service)
+# The helper also auto-approves/rejects demo requests and then streams NHS data through the filter
 ```

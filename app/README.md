@@ -29,13 +29,7 @@ npm run consume
 # set TOPICS="nhs.consent.decisions" npm run consume   # optional override
 ```
 
-## 4) Produce mock NHS prescription events
-```bash
-npm run produce:nhs
-```
-Emits both `nhs.raw.prescriptions` and `nhs.enriched.prescriptions` events per patient.
-
-## 5) Run consent wallet service + UI
+## 4) Run consent wallet service + UI
 ```bash
 npm run consent:service
 # UI/API at http://localhost:3000
@@ -43,31 +37,36 @@ npm run consent:service
 Consumes DWP requests, queues them for wallet approval, and publishes citizen decisions to `nhs.consent.decisions` plus audit entries to `nhs.audit.events`. The dashboard auto-refreshes every few seconds and shows a waiting state until requests arrive.
 If your Kafka brokers are quiet, the service now auto-seeds demo requests after a brief pause, and you can still use the "Inject demo requests" button to top up the queue.
 
-## 6) Start the consent gatekeeper (Kafka Streams-style join)
+## 5) Start the consent gatekeeper (Kafka Streams-style join)
 ```bash
 npm run consent:gatekeeper
 # HTTP state at http://localhost:3100/state
 ```
 This service performs a stream-table join: it builds an in-memory table of consent decisions from `nhs.consent.decisions` and `consent.events`, reads `nhs.raw.prescriptions`, and publishes approved rows to `dwp.filtered.prescriptions` while sending blocked rows to `dwp.blocked.prescriptions` with a rejection reason.
 
-## 7) Produce DWP consent requests
-Open a second terminal while the service is running:
+## 6) Produce and decide DWP consent requests
+Open a second terminal while the service is running so the wallet has something to process:
 ```bash
 npm run produce:dwp
-npm run dwp:portal
+# auto-approve/reject demo requests without clicking the wallet UI
+npm run decision:bot
 ```
-This triggers consent decisions and populates the UI/API.
+This triggers consent requests and then pretends to be a wallet user that approves or rejects the demo entries (you can still take manual decisions in the UI if you prefer).
 
 From the wallet dashboard you can approve or reject each inbound request. Approvals and rejections are streamed back to Kafka for downstream consumers and audit capture.
 
-The mock DWP portal (`npm run dwp:portal`) listens on http://localhost:4000 and reads the pre-filtered topics from the gatekeeper: approved events from `dwp.filtered.prescriptions` and blocked attempts from `dwp.blocked.prescriptions`. It still displays the latest consent decisions for context.
+## 7) Produce mock NHS prescription events (after decisions exist)
+```bash
+npm run produce:nhs
+```
+Emit prescriptions after the consent table has been populated so approved patients make it through to the DWP view. The mock DWP portal (`npm run dwp:portal`) listens on http://localhost:4000 and reads the pre-filtered topics from the gatekeeper: approved events from `dwp.filtered.prescriptions` and blocked attempts from `dwp.blocked.prescriptions`. It still displays the latest consent decisions for context.
 
 ## One-step demo (bootstrap everything)
 From the repo root:
 ```bash
 bash scripts/start-flow.sh
 ```
-This brings up Kafka, creates topics, installs Node deps, starts the consent dashboard + consumer + gatekeeper + DWP portal, and sends sample NHS and DWP events. Open `http://localhost:3000` for the wallet and `http://localhost:4000` for the DWP filtered view.
+This brings up Kafka, creates topics, installs Node deps, starts the consent dashboard + consumer + gatekeeper + DWP portal, and sends sample NHS and DWP events. It also runs the wallet decision bot so approvals/rejections are captured automatically before the NHS prescriptions are published. Open `http://localhost:3000` for the wallet and `http://localhost:4000` for the DWP filtered view.
 
 ## Expected
 * Producer logs show RAW + ENRICHED prescription events.
