@@ -56,57 +56,63 @@ else
   fi
 fi
 
-# 1) Infra
-echo "[1/10] Starting Kafka + Kafka UI with $RUNTIME compose..."
+echo "[1/11] Stopping any previously running demo Node processes..."
+pkill -f 'consent-service.js' 2>/dev/null || true
+pkill -f 'consent-gatekeeper.js' 2>/dev/null || true
+pkill -f 'dwp-portal.js' 2>/dev/null || true
+pkill -f 'simple-consumer.js' 2>/dev/null || true
+
+# 2) Infra
+echo "[2/11] Starting Kafka + Kafka UI with $RUNTIME compose..."
 "${COMPOSE_CMD[@]}" up -d
 
-# 2) Topics
-echo "[2/10] Ensuring required topics exist..."
+# 3) Topics
+echo "[3/11] Ensuring required topics exist..."
 bash "$ROOT_DIR/scripts/topics-create.sh"
 
-# 3) Dependencies
-echo "[3/10] Installing Node dependencies..."
+# 4) Dependencies
+echo "[4/11] Installing Node dependencies..."
 cd "$APP_DIR"
 npm install
 
-# 4) Run consent dashboard (keeps UI available)
-echo "[4/10] Starting consent dashboard on http://localhost:3000 ..."
+# 5) Run consent dashboard (keeps UI available)
+echo "[5/11] Starting consent dashboard on http://localhost:3000 ..."
 KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run consent:service &
 CONSENT_PID=$!
 wait_for_http "http://localhost:3000/healthz" "Consent dashboard"
 
-# 5) Run multi-topic consumer
+# 6) Run multi-topic consumer
 sleep 2
-echo "[5/10] Starting consumer for nhs + consent topics..."
+echo "[6/11] Starting consumer for nhs + consent topics..."
 KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" TOPICS="nhs.raw.prescriptions,nhs.enriched.prescriptions,dwp.consent.requests,nhs.consent.decisions,nhs.audit.events" npm run consume &
 CONSUMER_PID=$!
 
-# 6) Run consent gatekeeper (stream-table join)
+# 7) Run consent gatekeeper (stream-table join)
 sleep 2
-echo "[6/10] Starting consent gatekeeper on http://localhost:3100/state ..."
+echo "[7/11] Starting consent gatekeeper on http://localhost:3100/state ..."
 KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run consent:gatekeeper &
 GATEKEEPER_PID=$!
 wait_for_http "http://localhost:3100/state" "Consent gatekeeper"
 
-# 7) Run DWP portal (filtered view)
+# 8) Run DWP portal (filtered view)
 sleep 2
-echo "[7/10] Starting DWP portal on http://localhost:4000 ..."
+echo "[8/11] Starting DWP portal on http://localhost:4000 ..."
 KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run dwp:portal &
 DWP_PORTAL_PID=$!
 wait_for_http "http://localhost:4000/healthz" "DWP portal"
 
-# 8) Produce consent requests from DWP
+# 9) Produce consent requests from DWP
 sleep 2
-echo "[8/10] Producing demo consent requests (DWP)..."
+echo "[9/11] Producing demo consent requests (DWP)..."
 KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run produce:dwp
 
-# 9) Auto-approve/reject using the wallet bot so data can flow without manual clicks
-echo "[9/10] Auto-deciding demo consent requests via wallet bot..."
+# 10) Auto-approve/reject using the wallet bot so data can flow without manual clicks
+echo "[10/11] Auto-deciding demo consent requests via wallet bot..."
 CONSENT_URL="http://localhost:3000" npm run decision:bot
 
-# 10) Produce NHS prescription events (will be filtered by gatekeeper)
+# 11) Produce NHS prescription events (will be filtered by gatekeeper)
 sleep 2
-echo "[10/10] Producing sample NHS prescriptions..."
+echo "[11/11] Producing sample NHS prescriptions..."
 KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run produce:nhs
 
 echo "---"

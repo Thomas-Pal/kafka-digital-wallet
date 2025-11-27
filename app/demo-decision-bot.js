@@ -41,8 +41,19 @@ async function run() {
   for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
     try {
       const pending = await fetchPending();
-      const pendingById = new Map(pending.map((p) => [p.correlationId, p]));
-      const targets = demoDecisions.filter((d) => pendingById.has(d.correlationId));
+      const targets = [];
+      const matchedPrefixes = new Set();
+
+      for (const req of pending) {
+        const match = demoDecisions.find((d) =>
+          req.correlationId === d.correlationId || req.correlationId.startsWith(`${d.correlationId}-`)
+        );
+
+        if (match && !matchedPrefixes.has(match.correlationId)) {
+          matchedPrefixes.add(match.correlationId);
+          targets.push({ ...match, correlationId: req.correlationId });
+        }
+      }
 
       if (!targets.length) {
         const pendingIds = pending.map((p) => p.correlationId).join(', ');
