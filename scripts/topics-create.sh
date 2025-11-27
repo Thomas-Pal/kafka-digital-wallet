@@ -17,6 +17,9 @@ TOPICS=(
   "nhs.audit.events"
   "dwp.consent.requests"
   "nhs.consent.decisions"
+  "consent.events"
+  "dwp.filtered.prescriptions"
+  "dwp.blocked.prescriptions"
 )
 
 for topic in "${TOPICS[@]}"; do
