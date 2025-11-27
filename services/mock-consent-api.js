@@ -7,8 +7,8 @@ const app = express();
 app.use(express.json());
 app.use((_, res, next) => {
   res.setHeader('Access-Control-Allow-Origin', '*');
-  res.setHeader('Access-Control-Allow-Headers', 'Content-Type');
   res.setHeader('Access-Control-Allow-Methods', 'GET,POST,OPTIONS');
+  res.setHeader('Access-Control-Allow-Headers', 'content-type');
   next();
 });
 app.options('*', (_req, res) => res.sendStatus(204));
@@ -29,20 +29,14 @@ app.post('/consent/grant', async (req, res) => {
     issuedAt: new Date().toISOString(),
     expiresAt: new Date(Date.now() + ttlDays * 864e5).toISOString()
   };
-  await producer.send({
-    topic: CONSENT_TOPIC,
-    messages: [{ key: `${rp}|${caseId}|${citizenId}`, value: JSON.stringify(evt) }]
-  });
+  await producer.send({ topic: CONSENT_TOPIC, messages: [{ key: `${rp}|${caseId}|${citizenId}`, value: JSON.stringify(evt) }] });
   res.json({ ok: true, evt });
 });
 
 app.post('/consent/revoke', async (req, res) => {
   const { rp, caseId, citizenId } = req.body;
   const evt = { eventType: 'revoke', rp, caseId, citizenId, at: new Date().toISOString() };
-  await producer.send({
-    topic: CONSENT_TOPIC,
-    messages: [{ key: `${rp}|${caseId}|${citizenId}`, value: JSON.stringify(evt) }]
-  });
+  await producer.send({ topic: CONSENT_TOPIC, messages: [{ key: `${rp}|${caseId}|${citizenId}`, value: JSON.stringify(evt) }] });
   res.json({ ok: true, evt });
 });
 

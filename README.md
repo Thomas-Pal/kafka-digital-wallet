@@ -9,13 +9,14 @@ gov-wallet-consent-poc/
 ├─ scripts/
 │  ├─ topics-create.sh
 │  ├─ topics-list.sh
-│  └─ seed.sh
+│  ├─ seed.sh
+│  └─ demo.sh
 ├─ services/
 │  ├─ package.json
 │  ├─ mock-nhs-producer.js            # RAW producer
 │  ├─ mock-consent-api.js             # tiny REST to issue consent events
 │  ├─ gatekeeper.js                   # RAW+consent -> VIEW
-│  ├─ dwp-consumer.js                 # prints/serves VIEW to portal
+│  ├─ dwp-consumer.js                 # prints/serves VIEW to portal and case list
 │  └─ config.js
 ├─ wallet-ui/                         # Vite React app (GOV.UK-style consent screen)
 │  ├─ index.html
@@ -24,7 +25,7 @@ gov-wallet-consent-poc/
 │  │  ├─ App.tsx
 │  │  └─ govuk.css
 │  └─ package.json
-├─ dwp-portal/                        # Vite React app showing filtered stream
+├─ dwp-portal/                        # Vite React app showing filtered stream per case
 │  ├─ index.html
 │  ├─ src/
 │  │  ├─ main.tsx
@@ -40,7 +41,14 @@ Kafka infra (Podman): `podman-compose.yml` spins up a single KRaft broker (PLAIN
 - CONSENT: `consent.events` (grants/revokes)
 - VIEW (per case/citizen): `views.permitted.dwp.<caseId>.<citizenId>` with `retention.ms=604800000` (7 days)
 
-## How to run the live demo (macOS with Podman)
+## One-hit demo runner (preferred)
+This brings everything up, seeds RAW events, and leaves you to click Allow/Revoke in the wallet while the portal updates.
+```bash
+bash scripts/demo.sh
+# logs land in ./logs/*.log; Ctrl+C stops background services started by the script
+```
+
+## Manual steps (if you prefer)
 1) Start Kafka + UI
 ```bash
 podman-compose up -d   # or: docker compose -f podman-compose.yml up -d
@@ -59,20 +67,21 @@ bash scripts/topics-create.sh
 ```bash
 cd services
 npm run consent-api   # :4000 REST to emit consent events
-npm run gatekeeper    # RAW+consent -> VIEW
-npm run dwp           # consumes VIEW and serves :5001
+npm run gatekeeper    # RAW+consent -> VIEW (per-case)
+npm run dwp           # consumes VIEW and serves :5001 (cases + views)
 ```
 5) Start UIs (2 terminals)
 ```bash
-(cd wallet-ui && npm run dev)   # http://localhost:5173 wallet consent screen
-(cd dwp-portal && npm run dev)  # http://localhost:5174 DWP portal
+(cd wallet-ui && npm run dev -- --host --port 5173)   # http://localhost:5173 wallet consent screen
+(cd dwp-portal && npm run dev -- --host --port 5174)  # http://localhost:5174 DWP portal (case list)
 ```
 6) Publish some RAW prescriptions and grant consent
 ```bash
 bash scripts/seed.sh
 # or manually: (cd services && npm run produce:nhs)
 ```
-7) In the wallet UI, click **Allow** (posts to :4000). The gatekeeper will begin emitting to `views.permitted.dwp.4711.nhs-999` and the DWP portal table updates within seconds.
+7) In the wallet UI, click **Allow** (posts to :4000). The gatekeeper will begin emitting to `views.permitted.dwp.<caseId>.<citizenId>`
+   and the DWP portal cards show the consent request indicator turning into ✅ Granted as filtered rows appear when permitted.
 8) Click **Revoke** (or POST /consent/revoke) to stop new VIEW events; after 7 days retention the VIEW topic empties.
 
 ## Troubleshooting (fast fixes)
@@ -84,10 +93,10 @@ bash scripts/seed.sh
 
 ## Architecture beat-by-beat (what we show live)
 - **NHS event published**: “Prescription issued for Joe” arrives in RAW (red) topic.
-- **Caseworker requests access**: A consent request appears in the wallet (mobile-style UI).
+- **Caseworker requests access**: Case card shows “consent request sent”; a consent request appears in the wallet (mobile-style UI).
 - **Citizen approves**: The consent event (purple) is recorded.
 - **Gatekeeper enforces consent**: A VIEW (green) stream is created for DWP/this case/this citizen only.
-- **DWP portal updates**: Caseworker sees only Joe’s prescriptions, minimal fields.
+- **DWP portal updates**: Caseworker sees only Joe’s prescriptions, minimal fields, per-case list with status chips.
 - **Revoke**: Citizen revokes consent; the VIEW stops receiving new events and data ages out automatically.
 
 Quality bar: topic names contain no PII, minimal payload in VIEW, 7-day retention, wallet-first consent UX, DWP never reads RAW.

@@ -1,5 +1,5 @@
 import { Kafka } from 'kafkajs';
-import { BROKERS, RAW_TOPIC, CONSENT_TOPIC, VIEW_TOPIC } from './config.js';
+import { BROKERS, RAW_TOPIC, CONSENT_TOPIC, VIEW_TOPIC, CASE_BY_CITIZEN } from './config.js';
 
 const kafka = new Kafka({ brokers: BROKERS });
 const consentStore = new Map(); // key: rp|case|citizen -> {active, scopes, expiresAt}
@@ -41,8 +41,10 @@ await raw.subscribe({ topic: RAW_TOPIC, fromBeginning: true });
 raw.run({
   eachMessage: async ({ message }) => {
     const event = JSON.parse(message.value.toString());
-    const viewTopic = VIEW_TOPIC('4711', event.patientId);
-    const key = keyFor('dwp', '4711', event.patientId);
+    const caseId = CASE_BY_CITIZEN[event.patientId];
+    if (!caseId) return; // not part of the demo mapping
+    const viewTopic = VIEW_TOPIC(caseId, event.patientId);
+    const key = keyFor('dwp', caseId, event.patientId);
     const consentEntry = consentStore.get(key);
     if (!consentEntry || !consentEntry.active || new Date(consentEntry.expiresAt) < new Date() || !consentEntry.scopes.has('prescriptions')) return;
 
@@ -58,7 +60,7 @@ raw.run({
     };
     await producer.send({
       topic: viewTopic,
-      messages: [{ key: event.patientId, value: JSON.stringify(minimal), headers: { rp: 'dwp', case_id: '4711' } }]
+      messages: [{ key: event.patientId, value: JSON.stringify(minimal), headers: { rp: 'dwp', case_id: caseId } }]
     });
     console.log('[view]', viewTopic, '→', event.patientId, minimal.prescription.drug);
   }
