@@ -1,9 +1,32 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "▶ Starting Kafka + UI (Podman)..."
-podman-compose up -d
+echo "▶ Preconditions"
+command -v podman >/dev/null || { echo "Podman is required"; exit 1; }
+command -v podman-compose >/dev/null || { echo "podman-compose is required"; exit 1; }
+command -v jq >/dev/null || { echo "jq is required"; exit 1; }
+
+OS=$(uname -s || echo unknown)
+if [[ "$OS" == "Darwin" ]]; then
+  if ! podman machine list --format json 2>/dev/null | jq -e '.[] | select(.Name=="podman-machine-default")' >/dev/null; then
+    echo "▶ Creating Podman machine 'podman-machine-default'..."
+    podman machine init podman-machine-default --now
+  elif ! podman machine list --format json 2>/dev/null | jq -e '.[] | select(.Name=="podman-machine-default" and .Running==true)' >/dev/null; then
+    echo "▶ Starting Podman machine 'podman-machine-default'..."
+    podman machine start podman-machine-default
+  fi
+fi
+
+echo "▶ Starting Kafka + UI (Podman compose)..."
+COMPOSE_PROJECT_NAME=gov-wallet-consent-demo podman-compose up -d
 echo "   Kafka UI: http://localhost:8080"
+
+echo "▶ Waiting for kafka health..."
+for _ in {1..30}; do
+  status=$(podman inspect -f '{{.State.Health.Status}}' kafka 2>/dev/null || echo "")
+  [[ "$status" == "healthy" ]] && break
+  sleep 1
+done
 
 echo "▶ Creating topics..."
 chmod +x scripts/*.sh

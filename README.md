@@ -1,5 +1,9 @@
 # GOV Wallet Consent Demo — One-Hit
 
+Prereqs:
+- Podman and podman-compose
+- jq
+
 Run:
 ```bash
 chmod +x demo.sh scripts/*.sh
@@ -17,6 +21,10 @@ Sends consent request (case 9001 → citizen nhs-999).
 You approve in wallet.
 
 Script then publishes RAW so the VIEW fills instantaneously.
+
+Notes:
+- On macOS, the script will create/start the default Podman machine (`podman-machine-default`) if needed before running podman-compose.
+- Containers are named `kafka` and `kafka-ui`; health is waited on before topic creation.
 
 URLs:
 
