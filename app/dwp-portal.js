@@ -366,6 +366,10 @@ const sendConsentRequest = async (request) => {
     requestingSystem: request.requestingSystem || defaultRequestingSystem
   };
 
+  if (!kafkaReady) {
+    throw new Error('Kafka is not ready; wait for the portal to finish connecting before sending a request');
+  }
+
   await producer.send({
     topic: consentRequestTopic,
     messages: [{ key: payload.patientId, value: JSON.stringify(payload) }]
