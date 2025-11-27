@@ -235,7 +235,8 @@ const renderDashboard = (state) => `
               throw new Error(body || 'Request failed');
             }
             const data = await res.json();
-            resultBox.textContent = `Sent request ${data.correlationId} for ${payload.patientId}. Open the wallet to approve it.`;
+            resultBox.textContent = 'Sent request ' + data.correlationId + ' for ' + payload.patientId +
+              '. Open the wallet to approve it.';
           } catch (err) {
             resultBox.textContent = 'Failed to send consent request: ' + (err.message || err);
           } finally {
