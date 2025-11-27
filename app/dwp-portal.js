@@ -12,9 +12,12 @@ const baseGroup = process.env.DWP_CONSUMER_GROUP || 'dwp-portal';
 const demoRunId = process.env.DEMO_RUN_ID;
 const consumerGroup = demoRunId ? `${baseGroup}-${demoRunId}` : baseGroup;
 let consumer = kafka.consumer({ groupId: consumerGroup });
+const producer = kafka.producer();
 
 const approvedTopic = process.env.DWP_APPROVED_TOPIC || 'dwp.filtered.prescriptions';
 const blockedTopic = process.env.DWP_BLOCKED_TOPIC || 'dwp.blocked.prescriptions';
+const consentRequestTopic = process.env.DWP_CONSENT_TOPIC || 'dwp.consent.requests';
+const defaultRequestingSystem = process.env.DWP_REQUESTING_SYSTEM || 'DWP-casework-portal';
 
 let kafkaReady = false;
 let connecting = false;
@@ -23,8 +26,9 @@ let lastKafkaError = null;
 const consentByPatient = new Map();
 const deliveredRecords = [];
 const blockedRecords = [];
+const sentRequests = [];
 
-const maxRows = { consent: 100, delivered: 200, blocked: 100 };
+const maxRows = { consent: 100, delivered: 200, blocked: 100, requests: 50 };
 
 const renderDecisionChip = (decision = 'pending') => {
   const cls = decision === 'approved' ? 'approve' : decision === 'rejected' ? 'reject' : 'pending';
@@ -67,6 +71,52 @@ const renderDashboard = (state) => `
       <div class="muted">Brokers: ${state.brokers.join(', ')}${state.lastKafkaError ? ' | Last error: ' + state.lastKafkaError : ''}</div>
       <div class="muted">Approved consents: ${state.consentCount} | Delivered: ${state.deliveredCount} | Blocked (no consent): ${state.blockedCount}</div>
     </div>
+
+    <section>
+      <h2>Request patient consent</h2>
+      <p class="muted">Send a consent request to the citizen's wallet before opening their NHS data.</p>
+      <div class="grid" style="grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));">
+        ${state.samplePatients
+          .map(
+            (patient) => `
+              <div class="status" data-state="ok">
+                <strong>${patient.patientId}</strong>
+                <div class="muted">Purpose: ${patient.purpose}</div>
+                <div class="muted">Retention: ${patient.retention}</div>
+                <div class="muted">System: ${patient.requestingSystem}</div>
+                <button data-patient="${patient.patientId}" data-purpose="${patient.purpose}" data-retention="${patient.retention}" data-system="${patient.requestingSystem}">Request consent</button>
+              </div>`
+          )
+          .join('')}
+      </div>
+      <p id="request-result" class="muted"></p>
+      <div class="spacer"></div>
+      <h3>Recent consent requests</h3>
+      <table>
+        <thead>
+          <tr>
+            <th>Correlation</th>
+            <th>Patient</th>
+            <th>Purpose</th>
+            <th>Requested</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${state.requests
+            .map(
+              (row) => `
+                <tr>
+                  <td>${row.correlationId}</td>
+                  <td>${row.patientId}</td>
+                  <td>${row.purpose}</td>
+                  <td>${row.requestedAt}</td>
+                </tr>`
+            )
+            .join('')}
+        </tbody>
+      </table>
+      <div class="muted">Showing ${state.requests.length} of ${state.requestCount} sent requests.</div>
+    </section>
 
     <div class="grid">
       <section>
@@ -161,7 +211,39 @@ const renderDashboard = (state) => `
       <div class="muted">Showing ${state.blocked.length} of ${state.blockedCount} blocked events.</div>
     </section>
 
-    <p class="muted">API endpoints: <code>/api/state</code>, <code>/api/records</code>, <code>/api/blocked</code>, <code>/api/consents</code></p>
+    <p class="muted">API endpoints: <code>/api/state</code>, <code>/api/records</code>, <code>/api/blocked</code>, <code>/api/consents</code>, <code>/api/requests</code></p>
+    <script>
+      const resultBox = document.getElementById('request-result');
+      document.querySelectorAll('button[data-patient]').forEach((btn) => {
+        btn.addEventListener('click', async () => {
+          const payload = {
+            patientId: btn.dataset.patient,
+            purpose: btn.dataset.purpose,
+            retention: btn.dataset.retention,
+            requestingSystem: btn.dataset.system
+          };
+          btn.disabled = true;
+          resultBox.textContent = 'Sending consent request...';
+          try {
+            const res = await fetch('/api/request-consent', {
+              method: 'POST',
+              headers: { 'content-type': 'application/json' },
+              body: JSON.stringify(payload)
+            });
+            if (!res.ok) {
+              const body = await res.text();
+              throw new Error(body || 'Request failed');
+            }
+            const data = await res.json();
+            resultBox.textContent = `Sent request ${data.correlationId} for ${payload.patientId}. Open the wallet to approve it.`;
+          } catch (err) {
+            resultBox.textContent = 'Failed to send consent request: ' + (err.message || err);
+          } finally {
+            btn.disabled = false;
+          }
+        });
+      });
+    </script>
   </body>
 </html>`;
 
@@ -173,10 +255,22 @@ const snapshot = () => ({
   consentCount: consentByPatient.size,
   deliveredCount: deliveredRecords.length,
   blockedCount: blockedRecords.length,
+  requestCount: sentRequests.length,
   consents: Array.from(consentByPatient.values()).slice(0, maxRows.consent),
   delivered: deliveredRecords.slice(0, maxRows.delivered),
-  blocked: blockedRecords.slice(0, maxRows.blocked)
+  blocked: blockedRecords.slice(0, maxRows.blocked),
+  requests: sentRequests.slice(0, maxRows.requests),
+  samplePatients: [
+    { patientId: 'nhs-999', purpose: 'benefit-eligibility-check', retention: '6 months', requestingSystem: defaultRequestingSystem },
+    { patientId: 'nhs-123', purpose: 'fraud-prevention', retention: '3 months', requestingSystem: defaultRequestingSystem },
+    { patientId: 'nhs-777', purpose: 'fraud-prevention', retention: '3 months', requestingSystem: defaultRequestingSystem }
+  ]
 });
+
+const recordRequest = (request) => {
+  sentRequests.unshift(request);
+  if (sentRequests.length > maxRows.requests) sentRequests.pop();
+};
 
 const upsertConsent = (decision) => {
   if (!decision?.patientId) return;
@@ -262,8 +356,28 @@ async function startKafka() {
   }
 }
 
+const sendConsentRequest = async (request) => {
+  const payload = {
+    ...request,
+    correlationId:
+      request.correlationId || `req-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+    requestedAt: request.requestedAt || new Date().toISOString(),
+    requestingSystem: request.requestingSystem || defaultRequestingSystem
+  };
+
+  await producer.send({
+    topic: consentRequestTopic,
+    messages: [{ key: payload.patientId, value: JSON.stringify(payload) }]
+  });
+
+  recordRequest(payload);
+  console.log('📨 sent consent request for', payload.patientId, 'to topic', consentRequestTopic);
+  return payload;
+};
+
 const startService = async () => {
   const app = express();
+  app.use(express.json());
 
   app.get('/healthz', (_req, res) => {
     if (!kafkaReady) {
@@ -275,10 +389,29 @@ const startService = async () => {
   app.get('/api/records', (_req, res) => res.json(deliveredRecords));
   app.get('/api/blocked', (_req, res) => res.json(blockedRecords));
   app.get('/api/consents', (_req, res) => res.json(Array.from(consentByPatient.values())));
+  app.get('/api/requests', (_req, res) => res.json(sentRequests));
+
+  app.post('/api/request-consent', async (req, res) => {
+    try {
+      const { patientId, purpose, retention, requestingSystem } = req.body || {};
+      if (!patientId || !purpose) {
+        return res
+          .status(400)
+          .json({ error: 'patientId and purpose are required to send a consent request' });
+      }
+
+      const payload = await sendConsentRequest({ patientId, purpose, retention, requestingSystem });
+      return res.json({ ok: true, correlationId: payload.correlationId });
+    } catch (err) {
+      console.error('Failed to publish consent request', err);
+      return res.status(500).json({ error: err?.message || 'Failed to publish consent request' });
+    }
+  });
   app.get('/', (_req, res) => res.send(renderDashboard(snapshot())));
 
   const port = process.env.PORT || 4000;
   app.listen(port, () => console.log(`DWP caseworker portal at http://localhost:${port}`));
+  await producer.connect();
   startKafka();
 };
 

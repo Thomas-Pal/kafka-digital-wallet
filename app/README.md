@@ -35,7 +35,7 @@ npm run consent:service
 # UI/API at http://localhost:3000
 ```
 Consumes DWP requests, queues them for wallet approval, and publishes citizen decisions to `nhs.consent.decisions` plus audit entries to `nhs.audit.events`. The dashboard auto-refreshes every few seconds and shows a waiting state until requests arrive.
-If your Kafka brokers are quiet, the service now auto-seeds demo requests after a brief pause, and you can still use the "Inject demo requests" button to top up the queue.
+If your Kafka brokers are quiet, the service auto-seeds demo requests after a brief pause, and you can still use the "Inject demo requests" button to top up the queue.
 
 ## 5) Start the consent gatekeeper (Kafka Streams-style join)
 ```bash
@@ -45,15 +45,7 @@ npm run consent:gatekeeper
 This service performs a stream-table join: it builds an in-memory table of consent decisions from `nhs.consent.decisions` and `consent.events`, reads `nhs.raw.prescriptions`, and publishes approved rows to `dwp.filtered.prescriptions` while sending blocked rows to `dwp.blocked.prescriptions` with a rejection reason.
 
 ## 6) Produce and decide DWP consent requests
-Open a second terminal while the service is running so the wallet has something to process:
-```bash
-npm run produce:dwp
-# auto-approve/reject demo requests without clicking the wallet UI
-npm run decision:bot
-```
-This triggers consent requests and then pretends to be a wallet user that approves or rejects the demo entries (you can still take manual decisions in the UI if you prefer).
-
-From the wallet dashboard you can approve or reject each inbound request. Approvals and rejections are streamed back to Kafka for downstream consumers and audit capture.
+Use the DWP caseworker portal (`npm run dwp:portal`) to initiate consent requests to the wallet. The wallet UI shows pending rows where you manually approve or reject on behalf of the citizen. Approvals and rejections are streamed back to Kafka for downstream consumers and audit capture.
 
 ## 7) Produce mock NHS prescription events (after decisions exist)
 ```bash
@@ -66,8 +58,7 @@ From the repo root:
 ```bash
 bash scripts/start-flow.sh
 ```
-This brings up Kafka, creates topics, installs Node deps, starts the consent dashboard + consumer + gatekeeper + DWP portal, and sends sample NHS and DWP events. It also runs the wallet decision bot so approvals/rejections are captured automatically before the NHS prescriptions are published (the bot now reseeds demo requests if needed and will auto-approve any stragglers so the filtered view never stays empty). The script now waits for Kafka readiness on every service, verifies that consent requests and decisions have landed, and only publishes NHS prescriptions once the gatekeeper has a live consent cache. Afterward it polls the DWP portal APIs to ensure delivered/blocked rows are visible. Open `http://localhost:3000` for the wallet and `http://localhost:4000` for the DWP filtered view.
-If you re-run the script, it first clears any lingering demo Node processes **and** force-frees ports 3000, 3100, and 4000 so stale services cannot hide fresh data in the DWP caseworker view. Each run now exports a unique `DEMO_RUN_ID` so the gatekeeper and portal rebuild their state by replaying Kafka topics from the beginning rather than reusing an old consumer offset.
+This brings up Kafka, creates topics, installs Node deps, and starts the consent dashboard + consumer + gatekeeper + DWP portal. Use the portal to send a consent request to the wallet, approve or reject it, and once the wallet reports a decision the script publishes the NHS sample prescriptions so you can immediately see delivered vs blocked rows in the portal. If you re-run the script, it first clears any lingering demo Node processes **and** force-frees ports 3000, 3100, and 4000 so stale services cannot hide fresh data in the DWP caseworker view. Each run exports a unique `DEMO_RUN_ID` so the gatekeeper and portal rebuild their state by replaying Kafka topics from the beginning rather than reusing an old consumer offset.
 
 ## Expected
 * Producer logs show RAW + ENRICHED prescription events.

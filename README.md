@@ -11,16 +11,18 @@ cd app && npm i
 npm run consume            # terminal A (keep open)
 npm run consent:service    # terminal B (serves UI at http://localhost:3000)
 npm run produce:nhs        # terminal C
-npm run produce:dwp        # terminal D triggers consent flow
-npm run consent:gatekeeper # terminal E performs stream-table join + publishes filtered view
+npm run consent:gatekeeper # terminal D performs stream-table join + publishes filtered view
 npm run dwp:portal         # terminal E shows filtered NHS view for DWP at http://localhost:4000
+# From the portal, send consent requests to the wallet, approve/reject in the wallet UI, then re-run `npm run produce:nhs` to s
+ee filtered output.
 # (Optional UI) open http://localhost:8080 for Kafka UI
 ```
 
-Or run the whole sequence (infra, topics, install, dashboard, consumer, producers) with a single helper:
+Or run the whole sequence (infra, topics, install, dashboard, consumer, gatekeeper, portal) with a single helper:
 ```bash
 bash scripts/start-flow.sh   # requires Podman (podman machine up) or Docker running
 # consent UI at http://localhost:3000, Kafka UI at http://localhost:8080
 # DWP portal at http://localhost:4000 (filtered by consent via gatekeeper service)
-# The helper also auto-approves/rejects demo requests and then streams NHS data through the filter
+# Use the portal to send a consent request, approve or reject it in the wallet, and the script will publish NHS events afterward
+s so the filtered view shows up-to-date results.
 ```
