@@ -88,9 +88,9 @@ async function startKafka() {
     await consumer.connect();
 
     for (const topic of consentTopics) {
-      await consumer.subscribe({ topic, fromBeginning: false });
+      await consumer.subscribe({ topic, fromBeginning: true });
     }
-    await consumer.subscribe({ topic: prescriptionTopic, fromBeginning: false });
+    await consumer.subscribe({ topic: prescriptionTopic, fromBeginning: true });
 
     kafkaReady = true;
     lastKafkaError = null;

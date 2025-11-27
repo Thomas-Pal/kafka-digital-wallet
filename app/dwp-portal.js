@@ -420,9 +420,9 @@ async function startKafka() {
   connecting = true;
   try {
     await consumer.connect();
-    await consumer.subscribe({ topic: 'nhs.consent.decisions', fromBeginning: false });
-    await consumer.subscribe({ topic: approvedTopic, fromBeginning: false });
-    await consumer.subscribe({ topic: blockedTopic, fromBeginning: false });
+    await consumer.subscribe({ topic: 'nhs.consent.decisions', fromBeginning: true });
+    await consumer.subscribe({ topic: approvedTopic, fromBeginning: true });
+    await consumer.subscribe({ topic: blockedTopic, fromBeginning: true });
 
     kafkaReady = true;
     lastKafkaError = null;

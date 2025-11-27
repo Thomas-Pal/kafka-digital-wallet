@@ -294,7 +294,7 @@ async function startKafkaConsumer() {
   try {
     await producer.connect();
     await consumer.connect();
-    await consumer.subscribe({ topic: 'dwp.consent.requests', fromBeginning: false });
+    await consumer.subscribe({ topic: 'dwp.consent.requests', fromBeginning: true });
 
     kafkaReady = true;
     lastKafkaError = null;
