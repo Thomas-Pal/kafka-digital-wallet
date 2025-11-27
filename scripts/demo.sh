@@ -33,13 +33,24 @@ if ! command -v podman >/dev/null 2>&1; then
   echo "podman is required for this demo. Install podman and podman-compose."
   exit 1
 fi
+if ! command -v jq >/dev/null 2>&1; then
+  echo "jq is required for this demo. Install jq (e.g., brew install jq)."
+  exit 1
+fi
 
-# On macOS podman needs the VM running; auto-start if it's stopped to avoid exit 125
+# On macOS podman needs a VM; create+start it if it doesn't exist yet to avoid exit 125
 if command -v podman-machine >/dev/null 2>&1 || podman machine ls >/dev/null 2>&1; then
-  state=$(podman machine inspect --format '{{.State}}' 2>/dev/null || true)
-  if [ "$state" != "running" ]; then
-    echo "Starting podman machine (was: ${state:-unknown})..."
-    podman machine start
+  machines_json=$(podman machine ls --format json 2>/dev/null || echo '[]')
+  machine_count=$(echo "$machines_json" | jq 'length' 2>/dev/null || echo 0)
+  if [ "$machine_count" -eq 0 ]; then
+    echo "No podman machine found. Creating 'podman-machine-default' and starting it..."
+    podman machine init --name podman-machine-default --now
+  else
+    state=$(podman machine inspect --format '{{.State}}' 2>/dev/null || true)
+    if [ "$state" != "running" ]; then
+      echo "Starting podman machine (was: ${state:-unknown})..."
+      podman machine start
+    fi
   fi
 fi
 

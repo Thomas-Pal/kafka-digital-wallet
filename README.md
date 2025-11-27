@@ -36,13 +36,15 @@ gov-wallet-consent-poc/
 
 Kafka infra (Podman): `podman-compose.yml` spins up a single KRaft broker (PLAINTEXT, listeners on 9092/29092) and Kafka UI on :8080.
 
+Prereqs: Podman + podman-compose (or Docker + compose) and `jq` available on your PATH.
+
 **Topics & retention**
 - RAW: `nhs.raw.prescriptions` (keyed by patientId)
 - CONSENT: `consent.events` (grants/revokes)
 - VIEW (per case/citizen): `views.permitted.dwp.<caseId>.<citizenId>` with `retention.ms=604800000` (7 days) — created on demand when consent is active.
 
 ## One-hit demo runner (preferred)
-This brings everything up, seeds RAW events, and leaves you to click Allow/Revoke in the wallet while the portal updates. On macOS, it will auto-start the Podman machine if it's stopped to avoid the “exit status 125” error.
+This brings everything up, seeds RAW events, and leaves you to click Allow/Revoke in the wallet while the portal updates. On macOS, it will auto-start the Podman machine if it's stopped — and will create the default machine if you haven't run `podman machine init` yet — to avoid the “exit status 125” error.
 ```bash
 bash scripts/demo.sh
 # logs land in ./logs/*.log; Ctrl+C stops background services started by the script
