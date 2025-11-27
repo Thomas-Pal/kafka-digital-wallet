@@ -33,6 +33,10 @@ if ! command -v podman >/dev/null 2>&1; then
   echo "podman is required for this demo. Install podman and podman-compose."
   exit 1
 fi
+if ! command -v podman-compose >/dev/null 2>&1; then
+  echo "podman-compose is required for this demo. Install podman-compose."
+  exit 1
+fi
 if ! command -v jq >/dev/null 2>&1; then
   echo "jq is required for this demo. Install jq (e.g., brew install jq)."
   exit 1
@@ -43,14 +47,17 @@ if [[ "$(uname -s)" == "Darwin" ]] && podman machine ls >/dev/null 2>&1; then
   machines_json=$(podman machine ls --format json 2>/dev/null || echo '[]')
   machine_count=$(echo "$machines_json" | jq 'length' 2>/dev/null || echo 0)
   if [ "$machine_count" -eq 0 ]; then
-    echo "No podman machine found. Creating 'podman-machine-default' and starting it..."
-    # macOS podman 4.x expects the machine name without --name
-    podman machine init podman-machine-default --now
+    echo "No podman machine found. Creating 'podman-machine-default'..."
+    # macOS podman accepts the machine name as a positional arg; avoid the --name flag for compatibility
+    if ! podman machine init podman-machine-default; then
+      echo "podman machine init failed; is your podman installation healthy?"
+      exit 1
+    fi
   else
-    state=$(podman machine inspect --format '{{.State}}' 2>/dev/null || true)
+    state=$(podman machine inspect --format '{{.State}}' podman-machine-default 2>/dev/null || true)
     if [ "$state" != "running" ]; then
       echo "Starting podman machine (was: ${state:-unknown})..."
-      podman machine start
+      podman machine start podman-machine-default
     fi
   fi
 fi
