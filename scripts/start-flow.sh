@@ -40,40 +40,47 @@ else
 fi
 
 # 1) Infra
-echo "[1/6] Starting Kafka + Kafka UI with $RUNTIME compose..."
+echo "[1/7] Starting Kafka + Kafka UI with $RUNTIME compose..."
 "${COMPOSE_CMD[@]}" up -d
 
 # 2) Topics
-echo "[2/6] Ensuring required topics exist..."
+echo "[2/7] Ensuring required topics exist..."
 bash "$ROOT_DIR/scripts/topics-create.sh"
 
 # 3) Dependencies
-echo "[3/6] Installing Node dependencies..."
+echo "[3/7] Installing Node dependencies..."
 cd "$APP_DIR"
 npm install
 
 # 4) Run consent dashboard (keeps UI available)
-echo "[4/6] Starting consent dashboard on http://localhost:3000 ..."
+echo "[4/7] Starting consent dashboard on http://localhost:3000 ..."
 KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run consent:service &
 CONSENT_PID=$!
 
 # 5) Run multi-topic consumer
 sleep 2
-echo "[5/6] Starting consumer for nhs + consent topics..."
+echo "[5/7] Starting consumer for nhs + consent topics..."
 KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" TOPICS="nhs.raw.prescriptions,nhs.enriched.prescriptions,dwp.consent.requests,nhs.consent.decisions,nhs.audit.events" npm run consume &
 CONSUMER_PID=$!
 
+# 6) Run consent gatekeeper (stream-table join)
+sleep 2
+echo "[6/7] Starting consent gatekeeper on http://localhost:3100/state ..."
+KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run consent:gatekeeper &
+GATEKEEPER_PID=$!
+
 # 6) Produce demo events
 sleep 2
-echo "[6/6] Producing sample NHS + DWP events..."
+echo "[7/7] Producing sample NHS + DWP events..."
 KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run produce:nhs
 KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run produce:dwp
 
 echo "---"
 echo "Consent UI:   http://localhost:3000"
+echo "Gatekeeper:   http://localhost:3100/state"
 echo "Kafka UI:     http://localhost:8080"
 echo "Kafka broker: 127.0.0.1:29092"
-echo "Press Ctrl+C to stop the consumer + consent service" 
+echo "Press Ctrl+C to stop the consumer + consent service"
 
-trap 'echo "Stopping background services..."; kill $CONSUMER_PID $CONSENT_PID 2>/dev/null || true' INT TERM
-wait $CONSUMER_PID $CONSENT_PID
+trap 'echo "Stopping background services..."; kill $CONSUMER_PID $CONSENT_PID $GATEKEEPER_PID 2>/dev/null || true' INT TERM
+wait $CONSUMER_PID $CONSENT_PID $GATEKEEPER_PID

@@ -443,6 +443,11 @@ const startService = async () => {
       });
 
       await producer.send({
+        topic: 'consent.events',
+        messages: [{ key: decisionRecord.patientId, value: JSON.stringify(decisionRecord) }]
+      });
+
+      await producer.send({
         topic: 'nhs.audit.events',
         messages: [{ key: decisionRecord.patientId, value: JSON.stringify(auditEvent) }]
       });
