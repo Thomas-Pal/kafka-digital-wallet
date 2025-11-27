@@ -22,6 +22,23 @@ wait_for_http() {
   return 1
 }
 
+kill_port() {
+  local port="$1"
+  local pids=""
+
+  if command -v lsof >/dev/null 2>&1; then
+    pids=$(lsof -ti tcp:"${port}" || true)
+  elif command -v fuser >/dev/null 2>&1; then
+    pids=$(fuser "${port}/tcp" 2>/dev/null || true)
+  fi
+
+  if [[ -n "$pids" ]]; then
+    echo "Killing processes on port ${port}: ${pids}"
+    kill ${pids} 2>/dev/null || true
+    sleep 1
+  fi
+}
+
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 APP_DIR="$ROOT_DIR/app"
 COMPOSE_FILE="$ROOT_DIR/podman-compose.yml"
@@ -61,6 +78,9 @@ pkill -f 'consent-service.js' 2>/dev/null || true
 pkill -f 'consent-gatekeeper.js' 2>/dev/null || true
 pkill -f 'dwp-portal.js' 2>/dev/null || true
 pkill -f 'simple-consumer.js' 2>/dev/null || true
+kill_port 3000
+kill_port 3100
+kill_port 4000
 
 # 2) Infra
 echo "[2/11] Starting Kafka + Kafka UI with $RUNTIME compose..."
