@@ -71,6 +71,7 @@ const replayBuffered = async (rp, caseId, citizenId) => {
 };
 
 const producer = kafka.producer({ createPartitioner: Partitioners.LegacyPartitioner });
+const RUN_ID = process.env.RUN_ID || `${Date.now()}`;
 
 const waitForKafka = async () => {
   await admin.connect();
@@ -102,7 +103,7 @@ const runWithRetry = async (label, consumer, handler) => {
 };
 
 // consume consent events
-const consent = kafka.consumer({ groupId: 'gatekeeper-consent' });
+const consent = kafka.consumer({ groupId: `gatekeeper-consent-${RUN_ID}` });
 await consent.connect();
 await consent.subscribe({ topic: CONSENT_TOPIC, fromBeginning: true });
 runWithRetry('gatekeeper-consent', consent, async ({ message }) => {
@@ -127,7 +128,7 @@ runWithRetry('gatekeeper-consent', consent, async ({ message }) => {
 });
 
 // consume RAW and forward when permitted
-const raw = kafka.consumer({ groupId: 'gatekeeper-raw' });
+const raw = kafka.consumer({ groupId: `gatekeeper-raw-${RUN_ID}` });
 await raw.connect();
 await raw.subscribe({ topic: RAW_TOPIC, fromBeginning: true });
 runWithRetry('gatekeeper-raw', raw, async ({ message }) => {

@@ -93,7 +93,7 @@ bash scripts/seed.sh
 ## Troubleshooting (fast fixes)
 - **Advertised listeners**: all Node apps use `127.0.0.1:29092` matching `KAFKA_ADVERTISED_LISTENERS`.
 - **Topics**: rerun `scripts/topics-create.sh` if producers/consumers disagree on names.
-- **Offsets**: consumers subscribe with `fromBeginning:true`; change `groupId` if you need a fresh read.
+- **Offsets**: consumers now append a `RUN_ID` (default: current timestamp) to their `groupId` so every demo run re-reads RAW and CONSENT from the start. Set `RUN_ID=demo1` on all services if you want them aligned while still forcing a fresh read.
 - **Consent flow**: gatekeeper subscribes to both RAW and `consent.events`; DWP reads only VIEW topics.
 - **Dynamic VIEW topics**: DWP subscribes via regex (`views.permitted.dwp.*`) so new VIEW topics created on consent are picked up automatically; you no longer need placeholder VIEW topics.
 - **CORS**: mock services send permissive headers so Vite dev servers can call them directly.
