@@ -16,7 +16,7 @@ const prescriptionTopic = process.env.RAW_TOPIC || 'nhs.raw.prescriptions';
 const approvedTopic = process.env.APPROVED_TOPIC || 'dwp.filtered.prescriptions';
 const blockedTopic = process.env.BLOCKED_TOPIC || 'dwp.blocked.prescriptions';
 
-const kafka = new Kafka({ brokers, logLevel: logLevel.NOTHING });
+const kafka = new Kafka({ clientId: 'consent-gatekeeper', brokers, logLevel: logLevel.NOTHING });
 const baseGroup = process.env.GATEKEEPER_CONSUMER_GROUP || 'consent-gatekeeper';
 const demoRunId = process.env.DEMO_RUN_ID;
 const consumerGroup = demoRunId ? `${baseGroup}-${demoRunId}` : baseGroup;
@@ -88,9 +88,9 @@ async function startKafka() {
     await consumer.connect();
 
     for (const topic of consentTopics) {
-      await consumer.subscribe({ topic, fromBeginning: true });
+      await consumer.subscribe({ topic, fromBeginning: false });
     }
-    await consumer.subscribe({ topic: prescriptionTopic, fromBeginning: true });
+    await consumer.subscribe({ topic: prescriptionTopic, fromBeginning: false });
 
     kafkaReady = true;
     lastKafkaError = null;

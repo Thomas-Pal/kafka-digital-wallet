@@ -7,7 +7,7 @@ const brokers = brokerConfig
   .map((entry) => entry.trim())
   .filter(Boolean);
 
-const kafka = new Kafka({ brokers, logLevel: logLevel.NOTHING });
+const kafka = new Kafka({ clientId: 'dwp-portal', brokers, logLevel: logLevel.NOTHING });
 const baseGroup = process.env.DWP_CONSUMER_GROUP || 'dwp-portal';
 const demoRunId = process.env.DEMO_RUN_ID;
 const consumerGroup = demoRunId ? `${baseGroup}-${demoRunId}` : baseGroup;
@@ -420,9 +420,9 @@ async function startKafka() {
   connecting = true;
   try {
     await consumer.connect();
-    await consumer.subscribe({ topic: 'nhs.consent.decisions', fromBeginning: true });
-    await consumer.subscribe({ topic: approvedTopic, fromBeginning: true });
-    await consumer.subscribe({ topic: blockedTopic, fromBeginning: true });
+    await consumer.subscribe({ topic: 'nhs.consent.decisions', fromBeginning: false });
+    await consumer.subscribe({ topic: approvedTopic, fromBeginning: false });
+    await consumer.subscribe({ topic: blockedTopic, fromBeginning: false });
 
     kafkaReady = true;
     lastKafkaError = null;

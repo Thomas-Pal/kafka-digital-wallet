@@ -7,7 +7,7 @@ const brokers = brokerConfig
   .map((entry) => entry.trim())
   .filter(Boolean);
 
-const kafka = new Kafka({ brokers, logLevel: logLevel.NOTHING });
+const kafka = new Kafka({ clientId: 'consent-service', brokers, logLevel: logLevel.NOTHING });
 const baseGroup = process.env.CONSENT_CONSUMER_GROUP || 'consent-service';
 const demoRunId = process.env.DEMO_RUN_ID;
 const consumerGroup = demoRunId ? `${baseGroup}-${demoRunId}` : baseGroup;
@@ -294,7 +294,7 @@ async function startKafkaConsumer() {
   try {
     await producer.connect();
     await consumer.connect();
-    await consumer.subscribe({ topic: 'dwp.consent.requests', fromBeginning: true });
+    await consumer.subscribe({ topic: 'dwp.consent.requests', fromBeginning: false });
 
     kafkaReady = true;
     lastKafkaError = null;
