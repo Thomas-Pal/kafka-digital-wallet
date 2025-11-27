@@ -37,6 +37,8 @@ npm run consent:service
 Consumes DWP requests, queues them for wallet approval, and publishes citizen decisions to `nhs.consent.decisions` plus audit entries to `nhs.audit.events`. The dashboard auto-refreshes every few seconds and shows a waiting state until requests arrive.
 Send consent requests from the DWP portal to populate the wallet queue for testing.
 
+> Kafka UI tip: the wallet, gatekeeper, and DWP portal now use fixed consumer groups (`consent-service`, `consent-gatekeeper`, `dwp-portal`) so you can see them as active consumers while debugging.
+
 ## 6) Start the consent gatekeeper (Kafka Streams-style join)
 ```bash
 npm run consent:gatekeeper

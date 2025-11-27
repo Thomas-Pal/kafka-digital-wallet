@@ -8,7 +8,8 @@ const brokers = brokerConfig
   .filter(Boolean);
 
 const kafka = new Kafka({ brokers, logLevel: logLevel.NOTHING });
-const consumerGroup = process.env.DWP_CONSUMER_GROUP || `dwp-portal-${Date.now()}`;
+// Fixed group ID keeps the consumer visible in Kafka UI
+const consumerGroup = process.env.DWP_CONSUMER_GROUP || 'dwp-portal';
 let consumer = kafka.consumer({ groupId: consumerGroup });
 
 const approvedTopic = process.env.DWP_APPROVED_TOPIC || 'dwp.filtered.prescriptions';

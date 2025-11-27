@@ -7,10 +7,9 @@ const brokers = brokerConfig
   .map((entry) => entry.trim())
   .filter(Boolean);
 
-const kafka = new Kafka({ clientId: 'consent-service', brokers, logLevel: logLevel.NOTHING });
-const baseGroup = process.env.CONSENT_CONSUMER_GROUP || 'consent-service';
-const demoRunId = process.env.DEMO_RUN_ID;
-const consumerGroup = demoRunId ? `${baseGroup}-${demoRunId}` : baseGroup;
+const kafka = new Kafka({ brokers, logLevel: logLevel.NOTHING });
+// Use a stable group ID so Kafka UI shows a predictable consumer name
+const consumerGroup = process.env.CONSENT_CONSUMER_GROUP || 'consent-service';
 let consumer = kafka.consumer({ groupId: consumerGroup });
 let producer = kafka.producer();
 
