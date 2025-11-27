@@ -16,10 +16,8 @@ const prescriptionTopic = process.env.RAW_TOPIC || 'nhs.raw.prescriptions';
 const approvedTopic = process.env.APPROVED_TOPIC || 'dwp.filtered.prescriptions';
 const blockedTopic = process.env.BLOCKED_TOPIC || 'dwp.blocked.prescriptions';
 
-const kafka = new Kafka({ clientId: 'consent-gatekeeper', brokers, logLevel: logLevel.NOTHING });
-const baseGroup = process.env.GATEKEEPER_CONSUMER_GROUP || 'consent-gatekeeper';
-const demoRunId = process.env.DEMO_RUN_ID;
-const consumerGroup = demoRunId ? `${baseGroup}-${demoRunId}` : baseGroup;
+const kafka = new Kafka({ brokers, logLevel: logLevel.NOTHING });
+const consumerGroup = process.env.GATEKEEPER_CONSUMER_GROUP || `gatekeeper-${Date.now()}`;
 let consumer = kafka.consumer({ groupId: consumerGroup });
 let producer = kafka.producer();
 
@@ -28,26 +26,33 @@ let connecting = false;
 let lastKafkaError = null;
 
 const consentByPatient = new Map();
-const latestPrescriptionByPatient = new Map();
 let approvedCount = 0;
 let blockedCount = 0;
 
-const emitApproved = async (event, consent) => {
-  approvedCount += 1;
-  await producer.send({
-    topic: approvedTopic,
-    messages: [
-      {
-        key: event.patientId,
-        value: JSON.stringify({ ...event, consentDecision: consent })
-      }
-    ]
-  });
+const upsertConsent = (decision) => {
+  if (!decision?.patientId) return;
+  consentByPatient.set(decision.patientId, decision);
 };
 
-const emitRejected = async (event, consent) => {
+const evaluatePrescription = async (event) => {
+  const consent = consentByPatient.get(event.patientId);
+
+  if (consent?.decision === 'approved') {
+    approvedCount += 1;
+    await producer.send({
+      topic: approvedTopic,
+      messages: [
+        {
+          key: event.patientId,
+          value: JSON.stringify({ ...event, consentDecision: consent })
+        }
+      ]
+    });
+    return;
+  }
+
   blockedCount += 1;
-  const reason = consent?.reason || 'rejected by citizen';
+  const reason = consent?.decision === 'rejected' ? 'rejected by citizen' : 'no consent yet';
   await producer.send({
     topic: blockedTopic,
     messages: [
@@ -57,43 +62,6 @@ const emitRejected = async (event, consent) => {
       }
     ]
   });
-};
-
-const upsertConsent = async (decision) => {
-  if (!decision?.patientId) return;
-  consentByPatient.set(decision.patientId, decision);
-
-  const cached = latestPrescriptionByPatient.get(decision.patientId);
-  if (!cached) return;
-
-  if (decision.decision === 'approved') {
-    await emitApproved(cached, decision);
-    console.log('🔁 replayed cached prescription for', decision.patientId, 'after approval');
-  } else if (decision.decision === 'rejected') {
-    await emitRejected(cached, decision);
-    console.log('🚫 emitted blocked record for', decision.patientId, 'after rejection');
-  }
-};
-
-const evaluatePrescription = async (event) => {
-  if (!event?.patientId) return;
-
-  latestPrescriptionByPatient.set(event.patientId, event);
-  const consent = consentByPatient.get(event.patientId);
-
-  if (!consent) {
-    console.log('⏸️  holding prescription for', event.patientId, 'until consent decision arrives');
-    return;
-  }
-
-  if (consent.decision === 'approved') {
-    await emitApproved(event, consent);
-    return;
-  }
-
-  if (consent.decision === 'rejected') {
-    await emitRejected(event, consent);
-  }
 };
 
 const resetConsumer = async () => {
@@ -114,9 +82,9 @@ async function startKafka() {
     await consumer.connect();
 
     for (const topic of consentTopics) {
-      await consumer.subscribe({ topic, fromBeginning: false });
+      await consumer.subscribe({ topic, fromBeginning: true });
     }
-    await consumer.subscribe({ topic: prescriptionTopic, fromBeginning: false });
+    await consumer.subscribe({ topic: prescriptionTopic, fromBeginning: true });
 
     kafkaReady = true;
     lastKafkaError = null;
@@ -129,7 +97,7 @@ async function startKafka() {
           const payload = JSON.parse(raw);
 
           if (consentTopics.includes(topic)) {
-            await upsertConsent(payload);
+            upsertConsent(payload);
             console.log('📥 consent cache updated for', payload.patientId, payload.decision);
             return;
           }
@@ -157,12 +125,7 @@ async function startKafka() {
 const startService = async () => {
   const app = express();
 
-  app.get('/healthz', (_req, res) => {
-    if (!kafkaReady) {
-      return res.status(503).json({ status: 'starting', kafkaReady, brokers, lastKafkaError });
-    }
-    return res.json({ status: 'ok', kafkaReady, brokers });
-  });
+  app.get('/healthz', (_req, res) => res.json({ status: kafkaReady ? 'ok' : 'starting', brokers }));
   app.get('/state', (_req, res) =>
     res.json({
       kafkaReady,

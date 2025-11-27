@@ -37,33 +37,37 @@ npm run consent:service
 Consumes DWP requests, queues them for wallet approval, and publishes citizen decisions to `nhs.consent.decisions` plus audit entries to `nhs.audit.events`. The dashboard auto-refreshes every few seconds and shows a waiting state until requests arrive.
 Send consent requests from the DWP portal to populate the wallet queue for testing.
 
-## 5) Start the consent gatekeeper (Kafka Streams-style join)
+## 6) Start the consent gatekeeper (Kafka Streams-style join)
 ```bash
 npm run consent:gatekeeper
 # HTTP state at http://localhost:3100/state
 ```
-This service performs a stream-table join: it builds an in-memory table of consent decisions from `nhs.consent.decisions` and `consent.events`, reads `nhs.raw.prescriptions`, and publishes approved rows to `dwp.filtered.prescriptions` while only sending blocked rows to `dwp.blocked.prescriptions` when the citizen explicitly rejects the request.
+This service performs a stream-table join: it builds an in-memory table of consent decisions from `nhs.consent.decisions` and `consent.events`, reads `nhs.raw.prescriptions`, and publishes approved rows to `dwp.filtered.prescriptions` while sending blocked rows to `dwp.blocked.prescriptions` with a rejection reason.
 
-## 6) Publish NHS prescription events from the GP visit
+## 7) Produce DWP consent requests
+Open a second terminal while the service is running:
 ```bash
-npm run produce:nhs
+npm run produce:dwp
+npm run dwp:portal
 ```
 This simulates the GP logging a prescription before DWP has asked for consent. The gatekeeper will hold the latest raw event per patient and evaluate it once consent arrives. Sample events are emitted for `nhs-999`, `nhs-123`, and `nhs-777` so they line up with the caseworker buttons in the portal.
 
 ## 7) Use the DWP caseworker portal to request consent
 Run `npm run dwp:portal` to open http://localhost:4000. Send a consent request for the patient, then switch to the wallet UI to approve or reject access (and set the retention). When an approval arrives, the gatekeeper replays the cached raw prescription into `dwp.filtered.prescriptions`; rejections move the record into `dwp.blocked.prescriptions`.
 
+The mock DWP portal (`npm run dwp:portal`) listens on http://localhost:4000 and reads the pre-filtered topics from the gatekeeper: approved events from `dwp.filtered.prescriptions` and blocked attempts from `dwp.blocked.prescriptions`. It still displays the latest consent decisions for context.
+
 ## One-step demo (bootstrap everything)
 From the repo root:
 ```bash
 bash scripts/start-flow.sh
 ```
-This brings up Kafka, creates topics, installs Node deps, and starts the consent dashboard + consumer + gatekeeper + DWP portal. The script publishes the NHS sample prescriptions first (simulating the GP visit). Then you send a consent request from the DWP portal and approve/reject it in the wallet; the gatekeeper replays the cached prescription into the DWP filtered topic as soon as approval is granted. If you re-run the script, it first clears any lingering demo Node processes **and** force-frees ports 3000, 3100, and 4000 so stale services cannot hide fresh data in the DWP caseworker view. Each run exports a unique `DEMO_RUN_ID` so the gatekeeper and portal rebuild their state by replaying Kafka topics from the beginning rather than reusing an old consumer offset.
+This brings up Kafka, creates topics, installs Node deps, starts the consent dashboard + consumer + gatekeeper + DWP portal, and sends sample NHS and DWP events. Open `http://localhost:3000` for the wallet and `http://localhost:4000` for the DWP filtered view.
 
 ## Expected
 * Producer logs show RAW + ENRICHED prescription events.
 * Wallet UI lists pending DWP requests until you approve or reject them.
-* DWP portal holds records silently until consent arrives; approved patients replay into the filtered view, and explicit rejections appear in the blocked table.
+* DWP portal only surfaces NHS records for patients with an approved consent; others are shown as blocked.
 * Consent service logs `✅ user decision captured ...` once you take action from the wallet.
 * Consumer displays traffic across all configured topics.
 * Kafka UI shows topic growth; the consent UI at `http://localhost:3000` lists recent decisions.

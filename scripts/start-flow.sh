@@ -73,72 +73,48 @@ else
   fi
 fi
 
-DEMO_RUN_ID=$(date +%s)
-
-echo "[1/9] Stopping any previously running demo Node processes..."
-pkill -f 'consent-service.js' 2>/dev/null || true
-pkill -f 'consent-gatekeeper.js' 2>/dev/null || true
-pkill -f 'dwp-portal.js' 2>/dev/null || true
-pkill -f 'simple-consumer.js' 2>/dev/null || true
-kill_port 3000
-kill_port 3100
-kill_port 4000
-
-# 2) Infra
-echo "[2/9] Starting Kafka + Kafka UI with $RUNTIME compose..."
+# 1) Infra
+echo "[1/7] Starting Kafka + Kafka UI with $RUNTIME compose..."
 "${COMPOSE_CMD[@]}" up -d
 
-# 3) Topics
-echo "[3/9] Ensuring required topics exist..."
+# 2) Topics
+echo "[2/7] Ensuring required topics exist..."
 bash "$ROOT_DIR/scripts/topics-create.sh"
 
-# 4) Dependencies
-echo "[4/9] Installing Node dependencies..."
+# 3) Dependencies
+echo "[3/7] Installing Node dependencies..."
 cd "$APP_DIR"
 npm install
 
-# 5) Run consent dashboard (keeps UI available)
-echo "[5/9] Starting consent dashboard on http://localhost:3000 ..."
-DEMO_RUN_ID="$DEMO_RUN_ID" KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run consent:service &
+# 4) Run consent dashboard (keeps UI available)
+echo "[4/7] Starting consent dashboard on http://localhost:3000 ..."
+KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run consent:service &
 CONSENT_PID=$!
 wait_for_http "http://localhost:3000/healthz" "Consent dashboard"
 
 # 6) Run multi-topic consumer
 sleep 2
-echo "[6/9] Starting consumer for nhs + consent topics..."
-DEMO_RUN_ID="$DEMO_RUN_ID" KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" TOPICS="nhs.raw.prescriptions,nhs.enriched.prescriptions,dwp.consent.requests,nhs.consent.decisions,nhs.audit.events" npm run consume &
+echo "[5/7] Starting consumer for nhs + consent topics..."
+KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" TOPICS="nhs.raw.prescriptions,nhs.enriched.prescriptions,dwp.consent.requests,nhs.consent.decisions,nhs.audit.events" npm run consume &
 CONSUMER_PID=$!
 
-# 7) Run consent gatekeeper (stream-table join)
+# 6) Run consent gatekeeper (stream-table join)
 sleep 2
-echo "[7/9] Starting consent gatekeeper on http://localhost:3100/state ..."
-DEMO_RUN_ID="$DEMO_RUN_ID" KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run consent:gatekeeper &
+echo "[6/7] Starting consent gatekeeper on http://localhost:3100/state ..."
+KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run consent:gatekeeper &
 GATEKEEPER_PID=$!
-wait_for_http "http://localhost:3100/healthz" "Consent gatekeeper"
 
-# 8) Run DWP portal (filtered view)
+# 6) Produce demo events
 sleep 2
-echo "[8/9] Starting DWP portal on http://localhost:4000 ..."
-DEMO_RUN_ID="$DEMO_RUN_ID" KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run dwp:portal &
-DWP_PORTAL_PID=$!
-wait_for_http "http://localhost:4000/healthz" "DWP portal"
-
-# 9) Publish NHS records first (they exist from the GP visit before consent is requested)
-sleep 2
-echo "[9/9] Publishing NHS prescription events (these were recorded by the GP before the DWP caseworker asks for access)..."
+echo "[7/7] Producing sample NHS + DWP events..."
 KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run produce:nhs
 
 echo "---"
-echo "Consent UI:    http://localhost:3000"
-echo "Gatekeeper:    http://localhost:3100/state"
-echo "DWP portal:    http://localhost:4000"
-echo "Kafka UI:      http://localhost:8080"
-echo "Kafka broker:  127.0.0.1:29092"
-echo "Demo run ID:   ${DEMO_RUN_ID}"
-echo "1) From the DWP portal, send a consent request to the wallet for the patient/case."
-echo "2) In the wallet, approve/reject and choose how long to grant access."
-echo "3) Once approved, the gatekeeper replays the stored NHS record into the filtered DWP view."
+echo "Consent UI:   http://localhost:3000"
+echo "Gatekeeper:   http://localhost:3100/state"
+echo "Kafka UI:     http://localhost:8080"
+echo "Kafka broker: 127.0.0.1:29092"
 echo "Press Ctrl+C to stop the consumer + consent service"
 
-trap 'echo "Stopping background services..."; kill $CONSUMER_PID $CONSENT_PID $GATEKEEPER_PID $DWP_PORTAL_PID 2>/dev/null || true' INT TERM
-wait $CONSUMER_PID $CONSENT_PID $GATEKEEPER_PID $DWP_PORTAL_PID
+trap 'echo "Stopping background services..."; kill $CONSUMER_PID $CONSENT_PID $GATEKEEPER_PID 2>/dev/null || true' INT TERM
+wait $CONSUMER_PID $CONSENT_PID $GATEKEEPER_PID

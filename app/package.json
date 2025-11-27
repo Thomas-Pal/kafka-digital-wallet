@@ -13,7 +13,6 @@
     "consume": "node simple-consumer.js",
     "consent:service": "node consent-service.js",
     "consent:gatekeeper": "node consent-gatekeeper.js",
-    "dwp:portal": "node dwp-portal.js",
-    "decision:bot": "node demo-decision-bot.js"
+    "dwp:portal": "node dwp-portal.js"
   }
 }
