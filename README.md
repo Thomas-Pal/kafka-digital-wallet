@@ -39,7 +39,7 @@ Kafka infra (Podman): `podman-compose.yml` spins up a single KRaft broker (PLAIN
 **Topics & retention**
 - RAW: `nhs.raw.prescriptions` (keyed by patientId)
 - CONSENT: `consent.events` (grants/revokes)
-- VIEW (per case/citizen): `views.permitted.dwp.<caseId>.<citizenId>` with `retention.ms=604800000` (7 days)
+- VIEW (per case/citizen): `views.permitted.dwp.<caseId>.<citizenId>` with `retention.ms=604800000` (7 days) — created on demand when consent is active.
 
 ## One-hit demo runner (preferred)
 This brings everything up, seeds RAW events, and leaves you to click Allow/Revoke in the wallet while the portal updates.
@@ -55,7 +55,7 @@ podman-compose up -d   # or: docker compose -f podman-compose.yml up -d
 ```
 2) Create demo topics
 ```bash
-bash scripts/topics-create.sh
+bash scripts/topics-create.sh   # only RAW + CONSENT are created; VIEW topics are created by gatekeeper when consent is active
 ```
 3) Install dependencies
 ```bash
@@ -80,9 +80,8 @@ npm run dwp           # consumes VIEW and serves :5001 (cases + views)
 bash scripts/seed.sh
 # or manually: (cd services && npm run produce:nhs)
 ```
-7) In the DWP portal, click **Send consent request** on a case card. The wallet status will change from “not requested” to “requested”.
-8) In the wallet UI, click **Allow** (posts to :4000). The gatekeeper will begin emitting to `views.permitted.dwp.<caseId>.<citizenId>`
-   and the DWP portal cards show the consent request indicator turning into ✅ Granted as filtered rows appear when permitted.
+7) In the DWP portal, click **Send consent request** on a case card. The wallet stays empty until this request arrives.
+8) In the wallet UI, respond to the request (Allow/Stop sharing). Gatekeeper will immediately backfill recent RAW prescriptions and stream future ones to the matching VIEW topic for that case/citizen.
 9) Click **Revoke** (or POST /consent/revoke) to stop new VIEW events; after 7 days retention the VIEW topic empties.
 
 ## Troubleshooting (fast fixes)
