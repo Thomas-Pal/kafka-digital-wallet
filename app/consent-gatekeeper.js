@@ -127,7 +127,12 @@ async function startKafka() {
 const startService = async () => {
   const app = express();
 
-  app.get('/healthz', (_req, res) => res.json({ status: kafkaReady ? 'ok' : 'starting', brokers }));
+  app.get('/healthz', (_req, res) => {
+    if (!kafkaReady) {
+      return res.status(503).json({ status: 'starting', kafkaReady, brokers, lastKafkaError });
+    }
+    return res.json({ status: 'ok', kafkaReady, brokers });
+  });
   app.get('/state', (_req, res) =>
     res.json({
       kafkaReady,

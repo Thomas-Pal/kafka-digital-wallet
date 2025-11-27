@@ -66,7 +66,7 @@ From the repo root:
 ```bash
 bash scripts/start-flow.sh
 ```
-This brings up Kafka, creates topics, installs Node deps, starts the consent dashboard + consumer + gatekeeper + DWP portal, and sends sample NHS and DWP events. It also runs the wallet decision bot so approvals/rejections are captured automatically before the NHS prescriptions are published (the bot now reseeds demo requests if needed and will auto-approve any stragglers so the filtered view never stays empty). Open `http://localhost:3000` for the wallet and `http://localhost:4000` for the DWP filtered view.
+This brings up Kafka, creates topics, installs Node deps, starts the consent dashboard + consumer + gatekeeper + DWP portal, and sends sample NHS and DWP events. It also runs the wallet decision bot so approvals/rejections are captured automatically before the NHS prescriptions are published (the bot now reseeds demo requests if needed and will auto-approve any stragglers so the filtered view never stays empty). The script now waits for Kafka readiness on every service, verifies that consent requests and decisions have landed, and only publishes NHS prescriptions once the gatekeeper has a live consent cache. Afterward it polls the DWP portal APIs to ensure delivered/blocked rows are visible. Open `http://localhost:3000` for the wallet and `http://localhost:4000` for the DWP filtered view.
 If you re-run the script, it first clears any lingering demo Node processes **and** force-frees ports 3000, 3100, and 4000 so stale services cannot hide fresh data in the DWP caseworker view. Each run now exports a unique `DEMO_RUN_ID` so the gatekeeper and portal rebuild their state by replaying Kafka topics from the beginning rather than reusing an old consumer offset.
 
 ## Expected

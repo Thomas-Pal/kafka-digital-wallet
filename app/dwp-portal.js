@@ -265,7 +265,12 @@ async function startKafka() {
 const startService = async () => {
   const app = express();
 
-  app.get('/healthz', (_req, res) => res.send('ok'));
+  app.get('/healthz', (_req, res) => {
+    if (!kafkaReady) {
+      return res.status(503).json({ status: 'starting', kafkaReady, lastKafkaError });
+    }
+    return res.json({ status: 'ok', kafkaReady });
+  });
   app.get('/api/state', (_req, res) => res.json(snapshot()));
   app.get('/api/records', (_req, res) => res.json(deliveredRecords));
   app.get('/api/blocked', (_req, res) => res.json(blockedRecords));

@@ -403,7 +403,12 @@ const startService = async () => {
   const app = express();
   app.use(express.json());
 
-  app.get('/healthz', (_req, res) => res.send('ok'));
+  app.get('/healthz', (_req, res) => {
+    if (!kafkaReady) {
+      return res.status(503).json({ status: 'starting', kafkaReady, lastKafkaError });
+    }
+    return res.json({ status: 'ok', kafkaReady });
+  });
   app.get('/api/status', (_req, res) => res.json(statusSnapshot()));
   app.get('/api/state', (_req, res) =>
     res.json({ status: statusSnapshot(), requests: pendingRequests, decisions })
