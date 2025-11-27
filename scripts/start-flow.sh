@@ -5,6 +5,40 @@ set -euo pipefail
 # Brings up Kafka via podman-compose, creates topics, installs Node deps,
 # launches the consent dashboard + consumer, and then publishes sample events.
 
+wait_for_http() {
+  local url="$1"
+  local label="$2"
+  local attempts=60
+
+  for i in $(seq 1 "$attempts"); do
+    if curl -fsS "$url" >/dev/null 2>&1; then
+      echo "✓ ${label} is responding at ${url}"
+      return 0
+    fi
+    sleep 1
+  done
+
+  echo "${label} did not become ready after ${attempts}s: ${url}" >&2
+  return 1
+}
+
+kill_port() {
+  local port="$1"
+  local pids=""
+
+  if command -v lsof >/dev/null 2>&1; then
+    pids=$(lsof -ti tcp:"${port}" || true)
+  elif command -v fuser >/dev/null 2>&1; then
+    pids=$(fuser "${port}/tcp" 2>/dev/null || true)
+  fi
+
+  if [[ -n "$pids" ]]; then
+    echo "Killing processes on port ${port}: ${pids}"
+    kill ${pids} 2>/dev/null || true
+    sleep 1
+  fi
+}
+
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 APP_DIR="$ROOT_DIR/app"
 COMPOSE_FILE="$ROOT_DIR/podman-compose.yml"
@@ -56,8 +90,9 @@ npm install
 echo "[4/7] Starting consent dashboard on http://localhost:3000 ..."
 KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run consent:service &
 CONSENT_PID=$!
+wait_for_http "http://localhost:3000/healthz" "Consent dashboard"
 
-# 5) Run multi-topic consumer
+# 6) Run multi-topic consumer
 sleep 2
 echo "[5/7] Starting consumer for nhs + consent topics..."
 KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" TOPICS="nhs.raw.prescriptions,nhs.enriched.prescriptions,dwp.consent.requests,nhs.consent.decisions,nhs.audit.events" npm run consume &
@@ -73,7 +108,6 @@ GATEKEEPER_PID=$!
 sleep 2
 echo "[7/7] Producing sample NHS + DWP events..."
 KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run produce:nhs
-KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run produce:dwp
 
 echo "---"
 echo "Consent UI:   http://localhost:3000"

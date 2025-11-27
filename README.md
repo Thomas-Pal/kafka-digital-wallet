@@ -17,9 +17,11 @@ npm run dwp:portal         # terminal E shows filtered NHS view for DWP at http:
 # (Optional UI) open http://localhost:8080 for Kafka UI
 ```
 
-Or run the whole sequence (infra, topics, install, dashboard, consumer, producers) with a single helper:
+Or run the whole sequence (infra, topics, install, dashboard, consumer, gatekeeper, portal) with a single helper:
 ```bash
 bash scripts/start-flow.sh   # requires Podman (podman machine up) or Docker running
 # consent UI at http://localhost:3000, Kafka UI at http://localhost:8080
 # DWP portal at http://localhost:4000 (filtered by consent via gatekeeper service)
 ```
+
+The DWP filtered view intentionally starts empty: the gatekeeper now withholds publishing until a consent decision is received. Approvals replay the cached NHS prescription into `dwp.filtered.prescriptions`, and explicit rejections are the only time a record appears in `dwp.blocked.prescriptions`.
