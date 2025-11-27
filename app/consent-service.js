@@ -8,7 +8,8 @@ const brokers = brokerConfig
   .filter(Boolean);
 
 const kafka = new Kafka({ brokers, logLevel: logLevel.NOTHING });
-const consumerGroup = process.env.CONSENT_CONSUMER_GROUP || `consent-service-${Date.now()}`;
+// Use a stable group ID so Kafka UI shows a predictable consumer name
+const consumerGroup = process.env.CONSENT_CONSUMER_GROUP || 'consent-service';
 let consumer = kafka.consumer({ groupId: consumerGroup });
 let producer = kafka.producer();
 
