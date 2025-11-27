@@ -45,15 +45,7 @@ wait_for_decision() {
 
   for i in $(seq 1 "$attempts"); do
     local count
-    count=$(curl -fsS "$url" 2>/dev/null | python - <<'PY'
-import json, sys
-try:
-    data = json.loads(sys.stdin.read() or '[]')
-    print(len(data))
-except Exception:
-    print(0)
-PY
-)
+    count=$(curl -fsS "$url" 2>/dev/null | node -e "let data='';process.stdin.on('data',c=>data+=c);process.stdin.on('end',()=>{try{const parsed=JSON.parse(data||'[]');if(Array.isArray(parsed)){console.log(parsed.length);}else if(parsed && typeof parsed==='object'){console.log(Object.keys(parsed).length);}else{console.log(0);}}catch(e){console.log(0);}});")
     if [[ "$count" -ge 1 ]]; then
       echo "✓ Wallet has recorded at least one decision (${count} total)"
       return 0
