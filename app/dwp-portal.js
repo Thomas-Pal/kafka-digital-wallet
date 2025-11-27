@@ -67,9 +67,9 @@ const renderDashboard = (state) => `
     <p class="muted">Reads NHS prescription events but only shows records where the citizen has approved consent.</p>
 
     <div class="status" id="status" data-state="${state.kafkaReady ? 'ok' : 'warn'}">
-      <strong>${state.kafkaReady ? 'Connected to Kafka' : 'Kafka not ready'} (${state.consumerGroup})</strong>
-      <div class="muted">Brokers: ${state.brokers.join(', ')}${state.lastKafkaError ? ' | Last error: ' + state.lastKafkaError : ''}</div>
-      <div class="muted">Approved consents: ${state.consentCount} | Delivered: ${state.deliveredCount} | Blocked (no consent): ${state.blockedCount}</div>
+      <strong id="status-heading">${state.kafkaReady ? 'Connected to Kafka' : 'Kafka not ready'} (${state.consumerGroup})</strong>
+      <div class="muted" id="status-brokers">Brokers: ${state.brokers.join(', ')}${state.lastKafkaError ? ' | Last error: ' + state.lastKafkaError : ''}</div>
+      <div class="muted" id="status-counts">Approved consents: ${state.consentCount} | Delivered: ${state.deliveredCount} | Blocked (no consent): ${state.blockedCount}</div>
     </div>
 
     <section>
@@ -115,7 +115,7 @@ const renderDashboard = (state) => `
             .join('')}
         </tbody>
       </table>
-      <div class="muted">Showing ${state.requests.length} of ${state.requestCount} sent requests.</div>
+      <div class="muted" id="requests-count">Showing ${state.requests.length} of ${state.requestCount} sent requests.</div>
     </section>
 
     <div class="grid">
@@ -147,7 +147,7 @@ const renderDashboard = (state) => `
               .join('')}
           </tbody>
         </table>
-        <div class="muted">Showing ${state.consents.length} of ${state.consentCount} consent entries.</div>
+        <div class="muted" id="consents-count">Showing ${state.consents.length} of ${state.consentCount} consent entries.</div>
       </section>
 
       <section>
@@ -178,7 +178,7 @@ const renderDashboard = (state) => `
               .join('')}
           </tbody>
         </table>
-        <div class="muted">Showing ${state.delivered.length} of ${state.deliveredCount} delivered events.</div>
+        <div class="muted" id="delivered-count">Showing ${state.delivered.length} of ${state.deliveredCount} delivered events.</div>
       </section>
     </div>
 
@@ -208,13 +208,97 @@ const renderDashboard = (state) => `
             .join('')}
         </tbody>
       </table>
-      <div class="muted">Showing ${state.blocked.length} of ${state.blockedCount} blocked events.</div>
+      <div class="muted" id="blocked-count">Showing ${state.blocked.length} of ${state.blockedCount} blocked events.</div>
     </section>
 
     <p class="muted">API endpoints: <code>/api/state</code>, <code>/api/records</code>, <code>/api/blocked</code>, <code>/api/consents</code>, <code>/api/requests</code></p>
     <script>
       const resultBox = document.getElementById('request-result');
-      document.querySelectorAll('button[data-patient]').forEach((btn) => {
+      const statusBox = document.getElementById('status');
+      const statusHeading = document.getElementById('status-heading');
+      const statusBrokers = document.getElementById('status-brokers');
+      const statusCounts = document.getElementById('status-counts');
+
+      const requestsTable = document.querySelector('tbody');
+      const consentsTable = document.querySelectorAll('tbody')[1];
+      const deliveredTable = document.querySelectorAll('tbody')[2];
+      const blockedTable = document.querySelectorAll('tbody')[3];
+
+      const requestsCount = document.getElementById('requests-count');
+      const consentsCount = document.getElementById('consents-count');
+      const deliveredCount = document.getElementById('delivered-count');
+      const blockedCount = document.getElementById('blocked-count');
+
+      const requestButtons = Array.from(document.querySelectorAll('button[data-patient]'));
+
+      const renderRows = (rows, mapper) => rows.map(mapper).join('');
+
+      const applyState = (state) => {
+        statusBox.dataset.state = state.kafkaReady ? 'ok' : 'warn';
+        statusHeading.textContent = (state.kafkaReady ? 'Connected to Kafka' : 'Kafka not ready') + ' (' + state.consumerGroup + ')';
+        statusBrokers.textContent = 'Brokers: ' + state.brokers.join(', ') + (state.lastKafkaError ? ' | Last error: ' + state.lastKafkaError : '');
+        statusCounts.textContent = 'Approved consents: ' + state.consentCount + ' | Delivered: ' + state.deliveredCount + ' | Blocked (no consent): ' + state.blockedCount;
+
+        requestButtons.forEach((btn) => {
+          btn.disabled = !state.kafkaReady;
+          btn.title = state.kafkaReady ? '' : 'Waiting for Kafka connection before sending requests';
+        });
+
+        requestsTable.innerHTML = renderRows(state.requests, (row) => (
+          '<tr>' +
+          '<td>' + row.correlationId + '</td>' +
+          '<td>' + row.patientId + '</td>' +
+          '<td>' + row.purpose + '</td>' +
+          '<td>' + row.requestedAt + '</td>' +
+          '</tr>'
+        ));
+        consentsTable.innerHTML = renderRows(state.consents, (row) => (
+          '<tr>' +
+          '<td>' + row.patientId + '</td>' +
+          '<td>' + row.decision + '</td>' +
+          '<td>' + row.correlationId + '</td>' +
+          '<td>' + row.decidedAt + '</td>' +
+          '<td>' + row.reason + '</td>' +
+          '</tr>'
+        ));
+        deliveredTable.innerHTML = renderRows(state.delivered, (row) => (
+          '<tr>' +
+          '<td>' + row.patientId + '</td>' +
+          '<td>' + (row.prescription?.drug || 'n/a') + '</td>' +
+          '<td>' + (Array.isArray(row.flags) ? row.flags.join(', ') : '') + '</td>' +
+          '<td>' + row.receivedAt + '</td>' +
+          '<td><span class="pill approve">approved</span></td>' +
+          '</tr>'
+        ));
+        blockedTable.innerHTML = renderRows(state.blocked, (row) => (
+          '<tr>' +
+          '<td>' + row.patientId + '</td>' +
+          '<td>' + (row.prescription?.drug || 'n/a') + '</td>' +
+          '<td>' + row.reason + '</td>' +
+          '<td>' + row.receivedAt + '</td>' +
+          '</tr>'
+        ));
+
+        requestsCount.textContent = 'Showing ' + state.requests.length + ' of ' + state.requestCount + ' sent requests.';
+        consentsCount.textContent = 'Showing ' + state.consents.length + ' of ' + state.consentCount + ' consent entries.';
+        deliveredCount.textContent = 'Showing ' + state.delivered.length + ' of ' + state.deliveredCount + ' delivered events.';
+        blockedCount.textContent = 'Showing ' + state.blocked.length + ' of ' + state.blockedCount + ' blocked events.';
+      };
+
+      const refresh = async () => {
+        try {
+          const res = await fetch('/api/state');
+          if (!res.ok) throw new Error('Failed to fetch portal state');
+          const state = await res.json();
+          applyState(state);
+        } catch (err) {
+          statusBox.dataset.state = 'error';
+          statusHeading.textContent = 'Portal API unreachable';
+          resultBox.textContent = 'Failed to refresh portal state: ' + (err.message || err);
+        }
+      };
+
+      requestButtons.forEach((btn) => {
         btn.addEventListener('click', async () => {
           const payload = {
             patientId: btn.dataset.patient,
@@ -235,8 +319,8 @@ const renderDashboard = (state) => `
               throw new Error(body || 'Request failed');
             }
             const data = await res.json();
-            resultBox.textContent = 'Sent request ' + data.correlationId + ' for ' + payload.patientId +
-              '. Open the wallet to approve it.';
+            resultBox.textContent = 'Sent request ' + data.correlationId + ' for ' + payload.patientId + '. Open the wallet to approve it.';
+            refresh();
           } catch (err) {
             resultBox.textContent = 'Failed to send consent request: ' + (err.message || err);
           } finally {
@@ -244,6 +328,9 @@ const renderDashboard = (state) => `
           }
         });
       });
+
+      refresh();
+      setInterval(refresh, 5000);
     </script>
   </body>
 </html>`;
