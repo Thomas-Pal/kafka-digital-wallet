@@ -5,6 +5,23 @@ set -euo pipefail
 # Brings up Kafka via podman-compose, creates topics, installs Node deps,
 # launches the consent dashboard + consumer, and then publishes sample events.
 
+wait_for_http() {
+  local url="$1"
+  local label="$2"
+  local attempts=30
+
+  for i in $(seq 1 "$attempts"); do
+    if curl -fsS "$url" >/dev/null 2>&1; then
+      echo "✓ ${label} is responding at ${url}"
+      return 0
+    fi
+    sleep 1
+  done
+
+  echo "${label} did not become ready after ${attempts}s: ${url}" >&2
+  return 1
+}
+
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 APP_DIR="$ROOT_DIR/app"
 COMPOSE_FILE="$ROOT_DIR/podman-compose.yml"
@@ -40,40 +57,57 @@ else
 fi
 
 # 1) Infra
-echo "[1/6] Starting Kafka + Kafka UI with $RUNTIME compose..."
+echo "[1/8] Starting Kafka + Kafka UI with $RUNTIME compose..."
 "${COMPOSE_CMD[@]}" up -d
 
 # 2) Topics
-echo "[2/6] Ensuring required topics exist..."
+echo "[2/8] Ensuring required topics exist..."
 bash "$ROOT_DIR/scripts/topics-create.sh"
 
 # 3) Dependencies
-echo "[3/6] Installing Node dependencies..."
+echo "[3/8] Installing Node dependencies..."
 cd "$APP_DIR"
 npm install
 
 # 4) Run consent dashboard (keeps UI available)
-echo "[4/6] Starting consent dashboard on http://localhost:3000 ..."
+echo "[4/8] Starting consent dashboard on http://localhost:3000 ..."
 KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run consent:service &
 CONSENT_PID=$!
+wait_for_http "http://localhost:3000/healthz" "Consent dashboard"
 
 # 5) Run multi-topic consumer
 sleep 2
-echo "[5/6] Starting consumer for nhs + consent topics..."
+echo "[5/8] Starting consumer for nhs + consent topics..."
 KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" TOPICS="nhs.raw.prescriptions,nhs.enriched.prescriptions,dwp.consent.requests,nhs.consent.decisions,nhs.audit.events" npm run consume &
 CONSUMER_PID=$!
 
-# 6) Produce demo events
+# 6) Run consent gatekeeper (stream-table join)
 sleep 2
-echo "[6/6] Producing sample NHS + DWP events..."
+echo "[6/8] Starting consent gatekeeper on http://localhost:3100/state ..."
+KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run consent:gatekeeper &
+GATEKEEPER_PID=$!
+wait_for_http "http://localhost:3100/state" "Consent gatekeeper"
+
+# 7) Run DWP portal (filtered view)
+sleep 2
+echo "[7/8] Starting DWP portal on http://localhost:4000 ..."
+KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run dwp:portal &
+DWP_PORTAL_PID=$!
+wait_for_http "http://localhost:4000/healthz" "DWP portal"
+
+# 8) Produce demo events
+sleep 2
+echo "[8/8] Producing sample NHS + DWP events..."
 KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run produce:nhs
 KAFKA_BROKERS="127.0.0.1:29092,kafka:9092" npm run produce:dwp
 
 echo "---"
 echo "Consent UI:   http://localhost:3000"
+echo "Gatekeeper:   http://localhost:3100/state"
+echo "DWP portal:   http://localhost:4000"
 echo "Kafka UI:     http://localhost:8080"
 echo "Kafka broker: 127.0.0.1:29092"
-echo "Press Ctrl+C to stop the consumer + consent service" 
+echo "Press Ctrl+C to stop the consumer + consent service"
 
-trap 'echo "Stopping background services..."; kill $CONSUMER_PID $CONSENT_PID 2>/dev/null || true' INT TERM
-wait $CONSUMER_PID $CONSENT_PID
+trap 'echo "Stopping background services..."; kill $CONSUMER_PID $CONSENT_PID $GATEKEEPER_PID $DWP_PORTAL_PID 2>/dev/null || true' INT TERM
+wait $CONSUMER_PID $CONSENT_PID $GATEKEEPER_PID $DWP_PORTAL_PID

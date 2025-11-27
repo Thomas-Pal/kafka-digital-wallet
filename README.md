@@ -12,6 +12,8 @@ npm run consume            # terminal A (keep open)
 npm run consent:service    # terminal B (serves UI at http://localhost:3000)
 npm run produce:nhs        # terminal C
 npm run produce:dwp        # terminal D triggers consent flow
+npm run consent:gatekeeper # terminal E performs stream-table join + publishes filtered view
+npm run dwp:portal         # terminal E shows filtered NHS view for DWP at http://localhost:4000
 # (Optional UI) open http://localhost:8080 for Kafka UI
 ```
 
@@ -19,4 +21,5 @@ Or run the whole sequence (infra, topics, install, dashboard, consumer, producer
 ```bash
 bash scripts/start-flow.sh   # requires Podman (podman machine up) or Docker running
 # consent UI at http://localhost:3000, Kafka UI at http://localhost:8080
+# DWP portal at http://localhost:4000 (filtered by consent via gatekeeper service)
 ```
