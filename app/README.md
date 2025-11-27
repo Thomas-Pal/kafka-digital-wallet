@@ -11,11 +11,12 @@ podman-compose up -d                             # Podman (ensure podman machine
 
 > If you run the Node scripts inside a container, set `KAFKA_BROKER=kafka:9092` (or the reachable listener for your broker). The scripts default to `127.0.0.1:29092` for host execution and also accept a comma-separated `KAFKA_BROKERS` list (e.g. `127.0.0.1:29092,kafka:9092`).
 
-## 1) Create topics
+## 1) Create topics (with compacted consent streams)
 ```bash
 bash ../scripts/topics-create.sh
 # creates nhs.raw.prescriptions, nhs.enriched.prescriptions, nhs.audit.events, dwp.consent.requests, nhs.consent.decisions
 ```
+Consent streams (`nhs.consent.decisions` and `consent.events`) are compacted so the gatekeeper can treat them like a KTable keyed by patient ID.
 
 ## 2) Install deps
 ```bash
@@ -66,7 +67,7 @@ From the repo root:
 ```bash
 bash scripts/start-flow.sh
 ```
-This brings up Kafka, creates topics, installs Node deps, starts the consent dashboard + consumer, and sends sample NHS and DWP events. Open `http://localhost:3000` to watch the decisions arrive.
+This brings up Kafka, creates topics, installs Node deps, starts the consent dashboard + consumer + gatekeeper + DWP portal, and sends sample NHS and DWP events. Open `http://localhost:3000` for the wallet and `http://localhost:4000` for the DWP filtered view.
 
 ## Expected
 * Producer logs show RAW + ENRICHED prescription events.
