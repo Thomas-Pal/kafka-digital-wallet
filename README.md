@@ -95,6 +95,7 @@ bash scripts/seed.sh
 - **Topics**: rerun `scripts/topics-create.sh` if producers/consumers disagree on names.
 - **Offsets**: consumers subscribe with `fromBeginning:true`; change `groupId` if you need a fresh read.
 - **Consent flow**: gatekeeper subscribes to both RAW and `consent.events`; DWP reads only VIEW topics.
+- **Dynamic VIEW topics**: DWP subscribes via regex (`views.permitted.dwp.*`) so new VIEW topics created on consent are picked up automatically; you no longer need placeholder VIEW topics.
 - **CORS**: mock services send permissive headers so Vite dev servers can call them directly.
 - **Broker not ready / coordinator errors**: gatekeeper and DWP consumers auto-retry if the broker isn't ready yet, so leave them running while Podman finishes bringing Kafka up.
 

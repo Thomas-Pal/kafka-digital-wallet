@@ -1,6 +1,6 @@
 import { Kafka, logLevel } from 'kafkajs';
 import express from 'express';
-import { BROKERS, VIEW_TOPIC, CONSENT_TOPIC, DEMO_CASES, CONSENT_API_URL } from './config.js';
+import { BROKERS, CONSENT_TOPIC, DEMO_CASES, CONSENT_API_URL } from './config.js';
 
 const app = express();
 app.use((_, res, next) => {
@@ -60,14 +60,24 @@ async function runWithRetry(label, consumer, handler) {
 
 async function startViewConsumer() {
   await viewConsumer.connect();
-  for (const c of DEMO_CASES) {
-    await viewConsumer.subscribe({ topic: VIEW_TOPIC(c.caseId, c.citizenId), fromBeginning: true });
-  }
+  // Use a regex subscription so new view topics created by the gatekeeper are picked up automatically
+  await viewConsumer.subscribe({ topic: /^views\.permitted\.dwp\..+$/, fromBeginning: true });
   await runWithRetry('dwp-views', viewConsumer, async ({ topic, message }) => {
     const value = JSON.parse(message.value.toString());
-    const [_, __, ___, caseId] = topic.split('.');
+    const [, , , caseId, citizenId] = topic.split('.');
+    if (!cases.has(caseId)) {
+      cases.set(caseId, {
+        caseId,
+        citizenId,
+        citizenName: citizenId,
+        rp: 'dwp',
+        consentRequested: true,
+        consentStatus: 'granted',
+        lastConsentEvent: new Date().toISOString(),
+        rows: []
+      });
+    }
     const current = cases.get(caseId);
-    if (!current) return;
     current.rows.push({ ts: Date.now(), v: value });
     current.consentRequested = true;
     current.consentStatus = 'granted';
