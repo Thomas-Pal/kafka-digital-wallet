@@ -29,19 +29,13 @@ npm run consume
 # set TOPICS="nhs.consent.decisions" npm run consume   # optional override
 ```
 
-## 4) Produce mock NHS prescription events
-```bash
-npm run produce:nhs
-```
-Emits both `nhs.raw.prescriptions` and `nhs.enriched.prescriptions` events per patient.
-
-## 5) Run consent wallet service + UI
+## 4) Run consent wallet service + UI
 ```bash
 npm run consent:service
 # UI/API at http://localhost:3000
 ```
 Consumes DWP requests, queues them for wallet approval, and publishes citizen decisions to `nhs.consent.decisions` plus audit entries to `nhs.audit.events`. The dashboard auto-refreshes every few seconds and shows a waiting state until requests arrive.
-If your Kafka brokers are quiet, the service now auto-seeds demo requests after a brief pause, and you can still use the "Inject demo requests" button to top up the queue.
+Send consent requests from the DWP portal to populate the wallet queue for testing.
 
 > Kafka UI tip: the wallet, gatekeeper, and DWP portal now use fixed consumer groups (`consent-service`, `consent-gatekeeper`, `dwp-portal`) so you can see them as active consumers while debugging.
 
@@ -58,9 +52,10 @@ Open a second terminal while the service is running:
 npm run produce:dwp
 npm run dwp:portal
 ```
-This triggers consent decisions and populates the UI/API.
+This simulates the GP logging a prescription before DWP has asked for consent. The gatekeeper will hold the latest raw event per patient and evaluate it once consent arrives. Sample events are emitted for `nhs-999`, `nhs-123`, and `nhs-777` so they line up with the caseworker buttons in the portal.
 
-From the wallet dashboard you can approve or reject each inbound request. Approvals and rejections are streamed back to Kafka for downstream consumers and audit capture.
+## 7) Use the DWP caseworker portal to request consent
+Run `npm run dwp:portal` to open http://localhost:4000. Send a consent request for the patient, then switch to the wallet UI to approve or reject access (and set the retention). When an approval arrives, the gatekeeper replays the cached raw prescription into `dwp.filtered.prescriptions`; rejections move the record into `dwp.blocked.prescriptions`.
 
 The mock DWP portal (`npm run dwp:portal`) listens on http://localhost:4000 and reads the pre-filtered topics from the gatekeeper: approved events from `dwp.filtered.prescriptions` and blocked attempts from `dwp.blocked.prescriptions`. It still displays the latest consent decisions for context.
 

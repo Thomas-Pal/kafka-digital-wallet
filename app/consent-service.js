@@ -13,9 +13,6 @@ const consumerGroup = process.env.CONSENT_CONSUMER_GROUP || 'consent-service';
 let consumer = kafka.consumer({ groupId: consumerGroup });
 let producer = kafka.producer();
 
-const autoSeedDelayMs = Number(process.env.AUTO_SEED_MS || 4000);
-let autoSeeded = false;
-
 let kafkaReady = false;
 let connecting = false;
 let lastKafkaError = null;
@@ -23,30 +20,6 @@ let lastKafkaError = null;
 const pendingRequests = [];
 const decisions = [];
 const auditTrail = [];
-
-const demoRequests = [
-  {
-    correlationId: 'req-1001',
-    requestingSystem: 'DWP-benefits-gateway',
-    purpose: 'benefit-eligibility-check',
-    patientId: 'nhs-999',
-    retention: '6 months'
-  },
-  {
-    correlationId: 'req-1002',
-    requestingSystem: 'DWP-risk-analytics',
-    purpose: 'fraud-prevention',
-    patientId: 'nhs-123',
-    retention: '3 months'
-  },
-  {
-    correlationId: 'req-1003',
-    requestingSystem: 'DWP-risk-analytics',
-    purpose: 'fraud-prevention',
-    patientId: 'nhs-777',
-    retention: '3 months'
-  }
-];
 
 const upsertRequest = (request) => {
   if (!request?.correlationId) return;
@@ -137,11 +110,6 @@ const renderDashboard = () => `
       <strong id="status-text">Connecting to Kafka…</strong>
     </div>
 
-    <div class="spacer">
-      <button id="inject-demo" class="secondary">Inject demo requests</button>
-      <span class="muted">Add sample consent requests if nothing is flowing.</span>
-    </div>
-
     <div class="grid">
       <section>
         <h2>Incoming requests</h2>
@@ -158,7 +126,7 @@ const renderDashboard = () => `
           </thead>
           <tbody id="requests-body"></tbody>
         </table>
-        <div class="spacer muted" id="requests-empty">Waiting for requests… run the DWP producer to see rows arrive.</div>
+        <div class="spacer muted" id="requests-empty">Waiting for requests… send one from the DWP caseworker portal.</div>
       </section>
 
       <section>
@@ -195,7 +163,6 @@ const renderDashboard = () => `
       const decisionsEmpty = document.getElementById('decisions-empty');
       const statusBox = document.getElementById('status');
       const statusText = document.getElementById('status-text');
-      const injectDemo = document.getElementById('inject-demo');
 
       const setStatus = (state, text) => {
         statusBox.dataset.state = state;
@@ -210,7 +177,7 @@ const renderDashboard = () => `
 
       const applyStatus = (status) => {
         const suffix = status.pendingCount === 0 && status.decisionsCount === 0
-          ? ' — waiting for requests (or use demo injector).'
+          ? ' — waiting for requests from a data consumer.'
           : '';
 
         if (status.kafkaReady) {
@@ -249,15 +216,6 @@ const renderDashboard = () => `
           '</td>',
           '</tr>'
         ].join('');
-
-      injectDemo?.addEventListener('click', async () => {
-        try {
-          await fetch('/api/demo/requests', { method: 'POST' });
-          await refresh();
-        } catch (err) {
-          console.error('Failed to seed demo requests', err);
-        }
-      });
 
       const sendDecision = async (correlationId, decision) => {
         try {
@@ -369,47 +327,35 @@ const statusSnapshot = () => ({
   pendingCount: pendingRequests.length,
   decisionsCount: decisions.length,
   auditCount: auditTrail.length,
-  lastKafkaError,
-  autoSeeded
+  lastKafkaError
 });
-
-const seedDemo = async () => {
-  const now = Date.now();
-  const entries = demoRequests.map((req, idx) => ({
-    ...req,
-    correlationId: `${req.correlationId}-${now}-${idx}`,
-    requestedAt: new Date().toISOString()
-  }));
-
-  for (const entry of entries) {
-    upsertRequest(entry);
-  }
-
-  if (kafkaReady) {
-    try {
-      await producer.send({
-        topic: 'dwp.consent.requests',
-        messages: entries.map((req) => ({ key: req.patientId, value: JSON.stringify(req) }))
-      });
-      console.log('🧪 seeded demo consent requests into Kafka');
-    } catch (err) {
-      console.error('Failed to seed demo requests into Kafka', err);
-    }
-  } else {
-    console.log('🧪 demo requests added locally (Kafka not connected yet)');
-  }
-};
 
 const startService = async () => {
   const app = express();
   app.use(express.json());
 
-  app.get('/healthz', (_req, res) => res.send('ok'));
+  app.get('/healthz', (_req, res) => {
+    if (!kafkaReady) {
+      return res.status(503).json({ status: 'starting', kafkaReady, lastKafkaError });
+    }
+    return res.json({ status: 'ok', kafkaReady });
+  });
   app.get('/api/status', (_req, res) => res.json(statusSnapshot()));
   app.get('/api/state', (_req, res) =>
     res.json({ status: statusSnapshot(), requests: pendingRequests, decisions })
   );
   app.get('/api/requests', (_req, res) => res.json(pendingRequests));
+  app.post('/api/requests', (req, res) => {
+    const { correlationId, patientId, purpose, requestingSystem, retention, requestedAt } = req.body || {};
+    if (!correlationId || !patientId || !purpose) {
+      return res
+        .status(400)
+        .json({ error: 'correlationId, patientId, and purpose are required to record a consent request' });
+    }
+
+    upsertRequest({ correlationId, patientId, purpose, requestingSystem, retention, requestedAt });
+    return res.json({ ok: true });
+  });
   app.get('/api/decisions', (_req, res) => res.json(decisions));
   app.get('/api/audit', (_req, res) => res.json(auditTrail));
   app.post('/api/decisions', async (req, res) => {
@@ -465,11 +411,6 @@ const startService = async () => {
     res.json(decisionRecord);
   });
 
-  app.post('/api/demo/requests', async (_req, res) => {
-    await seedDemo();
-    res.json({ status: 'ok', count: pendingRequests.length });
-  });
-
   app.get('/', (_req, res) => res.send(renderDashboard()));
 
   const port = process.env.PORT || 3000;
@@ -479,18 +420,7 @@ const startService = async () => {
   startKafkaConsumer();
 };
 
-const scheduleAutoSeed = () => {
-  if (autoSeeded || autoSeedDelayMs <= 0) return;
-  setTimeout(async () => {
-    if (pendingRequests.length || decisions.length) return;
-    await seedDemo();
-    autoSeeded = true;
-  }, autoSeedDelayMs);
-};
-
 startService().catch((err) => {
   console.error('Consent service failed to start', err);
   process.exit(1);
 });
-
-scheduleAutoSeed();

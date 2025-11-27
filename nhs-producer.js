@@ -18,6 +18,8 @@ const producer = kafka.producer();
       prescription: { drug: 'Atorvastatin', dose: '20mg', repeats: 2, prescriber: 'GP-123', internalNotes: 'private' } },
     { patientId: 'nhs-123', recordedAt: now,
       prescription: { drug: 'Metformin', dose: '500mg', repeats: 1, prescriber: 'GP-555' } },
+    { patientId: 'nhs-777', recordedAt: now,
+      prescription: { drug: 'Amlodipine', dose: '5mg', repeats: 1, prescriber: 'GP-777', flags: ['hypertension'] } },
   ];
 
   for (const evt of events) {
