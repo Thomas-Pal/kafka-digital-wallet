@@ -1,5 +1,5 @@
 import { Kafka } from 'kafkajs';
-import { BROKERS, RAW_TOPIC, CONSENT_TOPIC, viewTopic } from './config.js';
+import { BROKERS, RAW_TOPIC, CONSENT_TOPIC, viewTopic, groupId, RUN_ID } from './config.js';
 
 const k = new Kafka({ brokers: BROKERS });
 const producer = k.producer();
@@ -13,7 +13,7 @@ const keyFor = (rp, caseId, citizenId) => `${rp}|${caseId}|${citizenId}`;
 const grantsByCitizen = new Map();
 
 // consume consent
-const consent = k.consumer({ groupId:'gatekeeper-consent' });
+const consent = k.consumer({ groupId: groupId('gatekeeper-consent') });
 await consent.connect();
 await consent.subscribe({ topic: CONSENT_TOPIC, fromBeginning:true });
 consent.run({
@@ -39,7 +39,7 @@ consent.run({
 });
 
 // consume RAW and forward if permitted
-const raw = k.consumer({ groupId:'gatekeeper-raw' });
+const raw = k.consumer({ groupId: groupId('gatekeeper-raw') });
 await raw.connect();
 await raw.subscribe({ topic: RAW_TOPIC, fromBeginning:true });
 
@@ -61,7 +61,7 @@ raw.run({
       };
       const topic = viewTopic(caseId, e.patientId);
       await producer.send({ topic, messages:[{ key:e.patientId, value: JSON.stringify(minimal), headers:{ rp:'dwp', case_id:caseId } }] });
-      console.log('[view]', topic, '→', e.patientId, minimal.prescription.drug);
+      console.log(`[view][${RUN_ID}]`, topic, '→', e.patientId, minimal.prescription.drug);
     }
   }
 });

@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-echo "▶ Preconditions"
+RUN_ID="${RUN_ID:-$(date +%s)}"
+export RUN_ID
+echo "▶ Preconditions (RUN_ID=$RUN_ID)"
 command -v podman >/dev/null || { echo "Podman is required"; exit 1; }
 command -v podman-compose >/dev/null || { echo "podman-compose is required"; exit 1; }
 command -v jq >/dev/null || { echo "jq is required"; exit 1; }
@@ -41,9 +43,9 @@ echo "▶ Starting backend services (background)..."
 pkill -f mock-consent-api.js || true
 pkill -f gatekeeper.js || true
 pkill -f dwp-service.js || true
-( cd services && nohup npm run consent-api >/tmp/consent-api.log 2>&1 & )
-( cd services && nohup npm run gatekeeper  >/tmp/gatekeeper.log 2>&1 & )
-( cd services && nohup npm run dwp        >/tmp/dwp.log 2>&1 & )
+( cd services && RUN_ID=$RUN_ID nohup npm run consent-api >/tmp/consent-api.log 2>&1 & )
+( cd services && RUN_ID=$RUN_ID nohup npm run gatekeeper  >/tmp/gatekeeper.log 2>&1 & )
+( cd services && RUN_ID=$RUN_ID nohup npm run dwp        >/tmp/dwp.log 2>&1 & )
 sleep 1
 
 echo "▶ Starting UIs (Wallet 5173, DWP 5174) ..."

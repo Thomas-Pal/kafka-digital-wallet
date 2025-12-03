@@ -22,6 +22,8 @@ You approve in wallet.
 
 Script then publishes RAW so the VIEW fills instantaneously.
 
+Each run uses a fresh `RUN_ID` (auto-generated) so consumer groups re-read RAW and CONSENT from the start. The topic creation step also deletes any prior `views.permitted.*` topics so only consent-driven views remain.
+
 Notes:
 - On macOS, the script will create/start the default Podman machine (`podman-machine-default`) if needed before running podman-compose.
 - Containers are named `kafka` and `kafka-ui`; health is waited on before topic creation.

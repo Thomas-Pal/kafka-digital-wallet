@@ -1,6 +1,6 @@
 import express from 'express';
 import { Kafka, logLevel } from 'kafkajs';
-import { BROKERS, CONSENT_TOPIC, viewTopic } from './config.js';
+import { BROKERS, CONSENT_TOPIC, viewTopic, groupId, RUN_ID } from './config.js';
 import { allowAll } from './utils/cors.js';
 
 const app = express();
@@ -16,7 +16,7 @@ const cases = new Map();
 const buffers = new Map();
 
 // track consent to set statuses and subscribe to new view topics when granted
-const consent = k.consumer({ groupId:'dwp-consent-status' });
+const consent = k.consumer({ groupId: groupId('dwp-consent-status') });
 await consent.connect();
 await consent.subscribe({ topic: CONSENT_TOPIC, fromBeginning:true });
 
@@ -25,7 +25,7 @@ const consumersByCase = new Map(); // caseId -> consumer
 async function ensureViewConsumer(caseId, citizenId) {
   if (consumersByCase.has(caseId)) return;
   const topic = viewTopic(caseId, citizenId);
-  const consumer = k.consumer({ groupId: `dwp-case-view-${caseId}` });
+  const consumer = k.consumer({ groupId: groupId(`dwp-case-view-${caseId}`) });
   await consumer.connect();
   await consumer.subscribe({ topic, fromBeginning:true });
   await consumer.run({
