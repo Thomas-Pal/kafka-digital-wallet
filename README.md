@@ -1,27 +1,47 @@
-# Kafka Digital Consent Wallet PoC
+# GOV Wallet Consent Demo — One-Hit
 
-Quick start for a local NHS prescription → Kafka demo, now modelled as a digital wallet where citizens approve or reject DWP data access. For full details see [app/README.md](app/README.md). Host clients should connect to Kafka at **127.0.0.1:29092** (or `kafka:9092` inside containers); the scripts accept a comma-separated `KAFKA_BROKERS` list and now default to `127.0.0.1:29092,kafka:9092` so either listener works out of the box.
+Prereqs:
+- Podman and podman-compose
+- jq
 
-## Usage
+Run:
 ```bash
-cd kafka-nhs-poc
-podman-compose up -d   # or: docker compose -f podman-compose.yml up -d
-bash scripts/topics-create.sh
-cd app && npm i
-npm run consume            # terminal A (keep open)
-npm run consent:service    # terminal B (serves UI at http://localhost:3000)
-npm run produce:nhs        # terminal C
-npm run produce:dwp        # terminal D triggers consent flow
-npm run consent:gatekeeper # terminal E performs stream-table join + publishes filtered view
-npm run dwp:portal         # terminal E shows filtered NHS view for DWP at http://localhost:4000
-# (Optional UI) open http://localhost:8080 for Kafka UI
+chmod +x demo.sh scripts/*.sh
+./demo.sh
 ```
 
-Or run the whole sequence (infra, topics, install, dashboard, consumer, gatekeeper, portal) with a single helper:
-```bash
-bash scripts/start-flow.sh   # requires Podman (podman machine up) or Docker running
-# consent UI at http://localhost:3000, Kafka UI at http://localhost:8080
-# DWP portal at http://localhost:4000 (filtered by consent via gatekeeper service)
-```
+Flow:
 
-The DWP filtered view intentionally starts empty: the gatekeeper now withholds publishing until a consent decision is received. Approvals replay the cached NHS prescription into `dwp.filtered.prescriptions`, and explicit rejections are the only time a record appears in `dwp.blocked.prescriptions`.
+Starts Kafka + UI, creates topics.
+
+Starts Consent API, Gatekeeper, DWP Service; starts Wallet UI and DWP Portal.
+
+Sends consent request (case 9001 → citizen nhs-999).
+
+You approve in wallet.
+
+Script then publishes RAW so the VIEW fills instantaneously.
+
+Each run uses a fresh `RUN_ID` (auto-generated) so consumer groups re-read RAW and CONSENT from the start. The topic creation step also deletes any prior `views.permitted.*` topics so only consent-driven views remain.
+
+Notes:
+- On macOS, the script will create/start the default Podman machine (`podman-machine-default`) if needed before running podman-compose.
+- Containers are named `kafka` and `kafka-ui`; the script force-removes any stale containers/pods with those names before compose to avoid name conflicts.
+- Service logs and pid files are written to `./logs` (populated by `demo.sh`); the script fails fast if any backend dies so you can inspect those logs immediately.
+
+URLs:
+
+Wallet: http://localhost:5173
+
+DWP Portal: http://localhost:5174
+
+Kafka UI: http://localhost:8080
+
+Consent API: http://localhost:4000
+
+DWP API: http://localhost:5001
+
+After creating the repo, also run:
+```bash
+chmod +x demo.sh scripts/*.sh
+```
