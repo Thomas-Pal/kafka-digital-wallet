@@ -26,7 +26,7 @@ Each run uses a fresh `RUN_ID` (auto-generated) so consumer groups re-read RAW a
 
 Notes:
 - On macOS, the script will create/start the default Podman machine (`podman-machine-default`) if needed before running podman-compose.
-- Containers are named `kafka` and `kafka-ui`; health is waited on before topic creation.
+- Containers are named `kafka` and `kafka-ui`; the script force-removes any stale containers/pods with those names before compose to avoid name conflicts.
 - Service logs are written to `./logs/*.log` (populated by `demo.sh`).
 
 URLs:

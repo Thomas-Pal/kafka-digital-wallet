@@ -20,11 +20,13 @@ if [[ "$OS" == "Darwin" ]]; then
 fi
 
 echo "▶ Starting Kafka + UI (Podman compose)..."
-# Clean up orphaned containers that can block new runs (common after crashes)
+# Clean up orphaned containers/pods that can block new runs (common after crashes or manual stops)
 for c in kafka kafka-ui; do
-  if podman ps -a --format '{{.Names}}' | grep -qx "$c"; then
-    podman rm -f "$c" >/dev/null 2>&1 || true
-  fi
+  podman rm -f "$c" >/dev/null 2>&1 || true
+done
+# Some Podman Desktop versions leave a compose pod behind; remove both legacy and current names
+for p in gov-wallet-consent-demo kafka-digital-wallet; do
+  podman pod rm -f "$p" >/dev/null 2>&1 || true
 done
 
 COMPOSE_PROJECT_NAME=gov-wallet-consent-demo podman-compose up -d
