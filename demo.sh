@@ -20,15 +20,27 @@ if [[ "$OS" == "Darwin" ]]; then
 fi
 
 echo "▶ Starting Kafka + UI (Podman compose)..."
+# Clean up orphaned containers that can block new runs (common after crashes)
+for c in kafka kafka-ui; do
+  if podman ps -a --format '{{.Names}}' | grep -qx "$c"; then
+    podman rm -f "$c" >/dev/null 2>&1 || true
+  fi
+done
+
 COMPOSE_PROJECT_NAME=gov-wallet-consent-demo podman-compose up -d
 echo "   Kafka UI: http://localhost:8080"
 
 echo "▶ Waiting for kafka health..."
-for _ in {1..30}; do
+healthy=""
+for _ in {1..40}; do
   status=$(podman inspect -f '{{.State.Health.Status}}' kafka 2>/dev/null || echo "")
-  [[ "$status" == "healthy" ]] && break
+  if [[ "$status" == "healthy" ]]; then healthy=1; break; fi
   sleep 1
 done
+if [[ -z "$healthy" ]]; then
+  echo "Kafka did not become healthy; check podman logs for 'kafka' and retry." >&2
+  exit 1
+fi
 
 echo "▶ Creating topics..."
 chmod +x scripts/*.sh
@@ -43,10 +55,19 @@ echo "▶ Starting backend services (background)..."
 pkill -f mock-consent-api.js || true
 pkill -f gatekeeper.js || true
 pkill -f dwp-service.js || true
-( cd services && RUN_ID=$RUN_ID nohup npm run consent-api >/tmp/consent-api.log 2>&1 & )
-( cd services && RUN_ID=$RUN_ID nohup npm run gatekeeper  >/tmp/gatekeeper.log 2>&1 & )
-( cd services && RUN_ID=$RUN_ID nohup npm run dwp        >/tmp/dwp.log 2>&1 & )
-sleep 1
+mkdir -p logs
+( cd services && RUN_ID=$RUN_ID nohup npm run consent-api >../logs/consent-api.log 2>&1 & echo $! >../logs/consent-api.pid )
+( cd services && RUN_ID=$RUN_ID nohup npm run gatekeeper  >../logs/gatekeeper.log 2>&1 & echo $! >../logs/gatekeeper.pid )
+( cd services && RUN_ID=$RUN_ID nohup npm run dwp        >../logs/dwp.log 2>&1 & echo $! >../logs/dwp.pid )
+sleep 2
+# Sanity-check the three services are still alive
+for name in consent-api gatekeeper dwp; do
+  pid_file="logs/${name}.pid"
+  if [[ ! -f $pid_file ]] || ! kill -0 "$(cat $pid_file 2>/dev/null)" 2>/dev/null; then
+    echo "Service $name failed to start. Check logs/${name}.log" >&2
+    exit 1
+  fi
+done
 
 echo "▶ Starting UIs (Wallet 5173, DWP 5174) ..."
 pkill -f "vite.*5173" || true
@@ -85,4 +106,4 @@ echo "   - Case 9001 status should be 'granted'"
 echo "   - Opening Case 9001 shows filtered prescription rows"
 echo ""
 echo "Troubleshoot logs:"
-echo "  tail -n +1 /tmp/consent-api.log /tmp/gatekeeper.log /tmp/dwp.log"
+echo "  tail -n +1 logs/consent-api.log logs/gatekeeper.log logs/dwp.log"

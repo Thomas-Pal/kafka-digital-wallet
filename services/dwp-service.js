@@ -8,6 +8,7 @@ app.use(express.json());
 app.use(allowAll);
 
 const k = new Kafka({ brokers: BROKERS, logLevel: logLevel.NOTHING });
+console.log(`[dwp-service][${RUN_ID}] starting, connecting to Kafka...`);
 
 // in-memory case registry
 // caseId -> { caseId, citizenId, status: 'requested'|'granted'|'revoked' }
@@ -47,9 +48,9 @@ consent.run({
     const { caseId, citizenId, eventType } = evt;
     if (!cases.has(caseId)) cases.set(caseId, { caseId, citizenId, status: 'requested' });
 
-    if (eventType === 'request') cases.get(caseId).status = 'requested';
-    if (eventType === 'grant')  { cases.get(caseId).status = 'granted'; await ensureViewConsumer(caseId, citizenId); }
-    if (eventType === 'revoke') cases.get(caseId).status = 'revoked';
+    if (eventType === 'request') { cases.get(caseId).status = 'requested'; console.log(`[dwp][${RUN_ID}] request case ${caseId} / ${citizenId}`); }
+    if (eventType === 'grant')  { cases.get(caseId).status = 'granted'; console.log(`[dwp][${RUN_ID}] grant case ${caseId} / ${citizenId}`); await ensureViewConsumer(caseId, citizenId); }
+    if (eventType === 'revoke') { cases.get(caseId).status = 'revoked'; console.log(`[dwp][${RUN_ID}] revoke case ${caseId} / ${citizenId}`); }
   }
 });
 

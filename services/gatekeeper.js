@@ -4,6 +4,7 @@ import { BROKERS, RAW_TOPIC, CONSENT_TOPIC, viewTopic, groupId, RUN_ID } from '.
 const k = new Kafka({ brokers: BROKERS });
 const producer = k.producer();
 await producer.connect();
+console.log(`[gatekeeper][${RUN_ID}] connected to Kafka, waiting for consent + RAW...`);
 
 // key: "rp|case|citizen" -> { active, scopes:Set, expiresAt }
 const consentStore = new Map();
@@ -47,12 +48,17 @@ raw.run({
   eachMessage: async ({ message }) => {
     const e = JSON.parse(message.value.toString()); // { patientId, recordedAt, prescription:{...} }
     const cases = grantsByCitizen.get(e.patientId) || new Set();
-    if (cases.size === 0) return; // no active grants for this citizen
+    if (cases.size === 0) {
+      console.log(`[raw][${RUN_ID}] ${e.patientId} skipped (no grants)`);
+      return; // no active grants for this citizen
+    }
 
     for (const caseId of cases) {
       const key = keyFor('dwp', caseId, e.patientId);
       const c = consentStore.get(key);
-      if (!c || !c.active || new Date(c.expiresAt) < new Date() || !c.scopes.has('prescriptions')) continue;
+      if (!c || !c.active) { console.log(`[raw][${RUN_ID}] ${e.patientId} -> case ${caseId} skipped (inactive)`); continue; }
+      if (new Date(c.expiresAt) < new Date()) { console.log(`[raw][${RUN_ID}] ${e.patientId} -> case ${caseId} skipped (expired)`); continue; }
+      if (!c.scopes.has('prescriptions')) { console.log(`[raw][${RUN_ID}] ${e.patientId} -> case ${caseId} skipped (scope)`); continue; }
 
       const minimal = {
         patientId: e.patientId,
