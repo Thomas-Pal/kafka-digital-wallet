@@ -1,17 +1,20 @@
-import { Kafka } from 'kafkajs';
-import { BROKERS, RAW_TOPIC, CONSENT_TOPIC, viewTopic, groupId, RUN_ID } from './config.js';
+import { RAW_TOPIC, CONSENT_TOPIC, groupId, RUN_ID } from './config.js';
+import { createKafka, viewTopic } from './lib/kafka.js';
 
-const k = new Kafka({ brokers: BROKERS });
+const k = createKafka(`gatekeeper-${RUN_ID}`);
 const producer = k.producer();
 await producer.connect();
 console.log(`[gatekeeper][${RUN_ID}] connected to Kafka, waiting for consent + RAW...`);
 
 // key: "rp|case|citizen" -> { active, scopes:Set, expiresAt }
 const consentStore = new Map();
+const casesByCitizen = new Map();
 const keyFor = (rp, caseId, citizenId) => `${rp}|${caseId}|${citizenId}`;
-
-// citizenId -> Set(caseId) for RP 'dwp'
-const grantsByCitizen = new Map();
+const indexCitizen = (key, citizenId) => {
+  const set = casesByCitizen.get(citizenId) || new Set();
+  set.add(key);
+  casesByCitizen.set(citizenId, set);
+};
 
 // consume consent
 const consent = k.consumer({ groupId: groupId('gatekeeper-consent') });
@@ -20,18 +23,16 @@ await consent.subscribe({ topic: CONSENT_TOPIC, fromBeginning:true });
 consent.run({
   eachMessage: async ({ message }) => {
     const evt = JSON.parse(message.value.toString());
-    if (evt.rp !== 'dwp') return; // demo scope
-    const key = keyFor(evt.rp, evt.caseId, evt.citizenId);
+    const { rp = 'dwp', caseId, citizenId, scopes = [], expiresAt } = evt;
+    const key = keyFor(rp, caseId, citizenId);
 
     if (evt.eventType === 'grant') {
-      consentStore.set(key, { active:true, scopes:new Set(evt.scopes||[]), expiresAt:evt.expiresAt });
-      const s = grantsByCitizen.get(evt.citizenId) || new Set();
-      s.add(evt.caseId); grantsByCitizen.set(evt.citizenId, s);
+      consentStore.set(key, { active: true, scopes: new Set(scopes), expiresAt });
+      indexCitizen(key, citizenId);
       console.log('[consent] grant', key);
     } else if (evt.eventType === 'revoke') {
-      consentStore.set(key, { active:false, scopes:new Set(), expiresAt:new Date(0).toISOString() });
-      const s = grantsByCitizen.get(evt.citizenId) || new Set();
-      s.delete(evt.caseId); grantsByCitizen.set(evt.citizenId, s);
+      consentStore.set(key, { active: false, scopes: new Set(), expiresAt: expiresAt || new Date(0).toISOString() });
+      indexCitizen(key, citizenId);
       console.log('[consent] revoke', key);
     } else if (evt.eventType === 'request') {
       console.log('[consent] request', key);
@@ -47,27 +48,28 @@ await raw.subscribe({ topic: RAW_TOPIC, fromBeginning:true });
 raw.run({
   eachMessage: async ({ message }) => {
     const e = JSON.parse(message.value.toString()); // { patientId, recordedAt, prescription:{...} }
-    const cases = grantsByCitizen.get(e.patientId) || new Set();
-    if (cases.size === 0) {
-      console.log(`[raw][${RUN_ID}] ${e.patientId} skipped (no grants)`);
-      return; // no active grants for this citizen
+    const keys = Array.from(casesByCitizen.get(e.patientId) || []);
+    if (keys.length === 0) {
+      console.log('[drop] no consent for', e.patientId);
+      return;
     }
 
-    for (const caseId of cases) {
-      const key = keyFor('dwp', caseId, e.patientId);
-      const c = consentStore.get(key);
-      if (!c || !c.active) { console.log(`[raw][${RUN_ID}] ${e.patientId} -> case ${caseId} skipped (inactive)`); continue; }
-      if (new Date(c.expiresAt) < new Date()) { console.log(`[raw][${RUN_ID}] ${e.patientId} -> case ${caseId} skipped (expired)`); continue; }
-      if (!c.scopes.has('prescriptions')) { console.log(`[raw][${RUN_ID}] ${e.patientId} -> case ${caseId} skipped (scope)`); continue; }
+    for (const k of keys) {
+      const c = consentStore.get(k);
+      const [, caseId, citizenId] = k.split('|');
+      if (!c) { console.log('[drop] no consent for', e.patientId); continue; }
+      if (!c.active) { console.log('[drop] inactive consent', k); continue; }
+      if (c.expiresAt && new Date(c.expiresAt) < new Date()) { console.log('[drop] expired', k); continue; }
+      if (!c.scopes.has('prescriptions')) { console.log('[drop] scope miss', k, [...c.scopes]); continue; }
+      if (citizenId !== e.patientId) { console.log('[drop] no consent for', e.patientId); continue; }
 
-      const minimal = {
-        patientId: e.patientId,
-        recordedAt: e.recordedAt,
-        prescription: { drug: e.prescription.drug, dose: e.prescription.dose, repeats: e.prescription.repeats, prescriber: e.prescription.prescriber }
-      };
-      const topic = viewTopic(caseId, e.patientId);
-      await producer.send({ topic, messages:[{ key:e.patientId, value: JSON.stringify(minimal), headers:{ rp:'dwp', case_id:caseId } }] });
-      console.log(`[view][${RUN_ID}]`, topic, '→', e.patientId, minimal.prescription.drug);
+      const topic = viewTopic(caseId, citizenId);
+      const rp = 'dwp';
+      await producer.send({
+        topic,
+        messages: [{ key: citizenId, value: JSON.stringify({ citizenId, rp, caseId, prescription: e.prescription, at: new Date().toISOString() }) }]
+      });
+      console.log('[view]', topic, '→', e.patientId, e.prescription);
     }
   }
 });

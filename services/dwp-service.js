@@ -1,41 +1,35 @@
 import express from 'express';
-import { Kafka, logLevel } from 'kafkajs';
-import { BROKERS, CONSENT_TOPIC, viewTopic, groupId, RUN_ID } from './config.js';
+import { CONSENT_TOPIC, groupId, RUN_ID } from './config.js';
+import { createKafka, viewTopic } from './lib/kafka.js';
 import { allowAll } from './utils/cors.js';
 
 const app = express();
 app.use(express.json());
 app.use(allowAll);
 
-const k = new Kafka({ brokers: BROKERS, logLevel: logLevel.NOTHING });
-console.log(`[dwp-service][${RUN_ID}] starting, connecting to Kafka...`);
+const cases = new Map(); // caseId -> { caseId, citizenId, status, view: [] }
+const kafka = createKafka(`dwp-service-${RUN_ID}`);
 
-// in-memory case registry
-// caseId -> { caseId, citizenId, status: 'requested'|'granted'|'revoked' }
-const cases = new Map();
-// caseId -> buffered view rows
-const buffers = new Map();
-
-// track consent to set statuses and subscribe to new view topics when granted
-const consent = k.consumer({ groupId: groupId('dwp-consent-status') });
+const consent = kafka.consumer({ groupId: groupId('dwp-consent-status') });
 await consent.connect();
-await consent.subscribe({ topic: CONSENT_TOPIC, fromBeginning:true });
+await consent.subscribe({ topic: CONSENT_TOPIC, fromBeginning: true });
 
-const consumersByCase = new Map(); // caseId -> consumer
-
+const consumersByCase = new Map();
 async function ensureViewConsumer(caseId, citizenId) {
   if (consumersByCase.has(caseId)) return;
   const topic = viewTopic(caseId, citizenId);
-  const consumer = k.consumer({ groupId: groupId(`dwp-case-view-${caseId}`) });
+  const consumer = kafka.consumer({ groupId: groupId(`dwp-case-view-${caseId}`) });
   await consumer.connect();
-  await consumer.subscribe({ topic, fromBeginning:true });
+  await consumer.subscribe({ topic, fromBeginning: true });
+  console.log('[dwp] subscribed to', topic);
   await consumer.run({
     eachMessage: async ({ message }) => {
-      const v = JSON.parse(message.value.toString());
-      const arr = buffers.get(caseId) || [];
-      arr.push({ ts: Date.now(), v });
-      if (arr.length > 200) arr.shift();
-      buffers.set(caseId, arr);
+      const m = JSON.parse(message.value.toString());
+      const entry = cases.get(caseId) || { caseId, citizenId, status: 'granted', view: [] };
+      entry.view = entry.view || [];
+      entry.view.push(m);
+      cases.set(caseId, entry);
+      console.log('[dwp:view]', topic, m.prescription);
     }
   });
   consumersByCase.set(caseId, consumer);
@@ -44,17 +38,23 @@ async function ensureViewConsumer(caseId, citizenId) {
 consent.run({
   eachMessage: async ({ message }) => {
     const evt = JSON.parse(message.value.toString());
-    if (evt.rp !== 'dwp') return;
-    const { caseId, citizenId, eventType } = evt;
-    if (!cases.has(caseId)) cases.set(caseId, { caseId, citizenId, status: 'requested' });
-
-    if (eventType === 'request') { cases.get(caseId).status = 'requested'; console.log(`[dwp][${RUN_ID}] request case ${caseId} / ${citizenId}`); }
-    if (eventType === 'grant')  { cases.get(caseId).status = 'granted'; console.log(`[dwp][${RUN_ID}] grant case ${caseId} / ${citizenId}`); await ensureViewConsumer(caseId, citizenId); }
-    if (eventType === 'revoke') { cases.get(caseId).status = 'revoked'; console.log(`[dwp][${RUN_ID}] revoke case ${caseId} / ${citizenId}`); }
+    if (evt.rp !== 'dwp' || evt.eventType !== 'grant') return;
+    const { caseId, citizenId } = evt;
+    const entry = cases.get(caseId) || { caseId, citizenId, status: 'granted', view: [] };
+    entry.citizenId = citizenId;
+    entry.status = 'granted';
+    entry.view = entry.view || [];
+    cases.set(caseId, entry);
+    await ensureViewConsumer(caseId, citizenId);
   }
 });
 
-app.get('/api/cases', (_req,res)=> res.json(Array.from(cases.values())));
-app.get('/api/case/:id/view', (req,res)=> res.json((buffers.get(req.params.id) || []).slice(-100)));
+app.get('/api/cases', (_req, res) => {
+  res.json(Array.from(cases.values()));
+});
 
-app.listen(5001, ()=>console.log('DWP Service on :5001 (GET /api/cases, /api/case/:id/view)'));
+app.get('/api/case/:id/view', (req, res) => {
+  res.json(cases.get(req.params.id)?.view || []);
+});
+
+app.listen(5001, () => console.log('DWP Service on :5001 (GET /api/cases, /api/case/:id/view)'));

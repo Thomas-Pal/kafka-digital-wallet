@@ -1,7 +1,7 @@
-import { Kafka } from 'kafkajs';
-import { BROKERS, RAW_TOPIC } from './config.js';
+import { RAW_TOPIC } from './config.js';
+import { createKafka } from './lib/kafka.js';
 
-const k = new Kafka({ brokers: BROKERS });
+const k = createKafka('nhs-producer');
 const p = k.producer();
 
 const now = () => new Date().toISOString();

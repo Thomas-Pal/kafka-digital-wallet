@@ -1,3 +1,14 @@
+# Runbook
+podman machine start
+podman compose down && podman rm -f kafka kafka-ui 2>/dev/null || true
+podman compose up -d
+chmod +x demo.sh
+./demo.sh
+# Open:
+#  Wallet: http://localhost:5173  (click "Grant consent")
+#  DWP:    http://localhost:5174  (Refresh → Load view)
+#  Kafka:  http://localhost:8080
+
 # GOV Wallet Consent Demo — One-Hit
 
 Prereqs:
@@ -45,3 +56,8 @@ After creating the repo, also run:
 ```bash
 chmod +x demo.sh scripts/*.sh
 ```
+
+# Troubleshoot
+podman logs kafka | grep -E '__consumer_offsets|GroupCoordinator|Coordinator' || true
+tail -n +1 logs/consent-api.log logs/gatekeeper.log logs/dwp.log
+podman exec kafka kafka-consumer-groups --bootstrap-server 127.0.0.1:29092 --list

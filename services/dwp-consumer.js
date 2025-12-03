@@ -1,6 +1,6 @@
-import { Kafka, logLevel } from 'kafkajs';
 import express from 'express';
-import { BROKERS, CONSENT_TOPIC, DEMO_CASES, CONSENT_API_URL } from './config.js';
+import { CONSENT_TOPIC, DEMO_CASES, CONSENT_API_URL } from './config.js';
+import { createKafka } from './lib/kafka.js';
 
 const app = express();
 app.use((_, res, next) => {
@@ -11,7 +11,7 @@ app.use((_, res, next) => {
 });
 app.options('*', (_req, res) => res.sendStatus(204));
 
-const kafka = new Kafka({ brokers: BROKERS, logLevel: logLevel.NOTHING });
+const kafka = createKafka('dwp-consumer');
 const RUN_ID = process.env.RUN_ID || `${Date.now()}`;
 const viewConsumer = kafka.consumer({ groupId: `dwp-case-views-${RUN_ID}` });
 const consentConsumer = kafka.consumer({ groupId: `dwp-consent-status-${RUN_ID}` });
