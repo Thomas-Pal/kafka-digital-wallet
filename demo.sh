@@ -21,6 +21,7 @@ fi
 
 echo "▶ Starting Kafka + UI (Podman compose)..."
 # Clean up orphaned containers/pods that can block new runs (common after crashes or manual stops)
+COMPOSE_PROJECT_NAME=gov-wallet-consent-demo podman-compose down -v --remove-orphans >/dev/null 2>&1 || true
 for c in kafka kafka-ui; do
   podman rm -f "$c" >/dev/null 2>&1 || true
 done
