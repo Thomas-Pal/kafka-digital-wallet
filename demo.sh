@@ -77,6 +77,11 @@ echo "▶ Installing dependencies..."
 ( cd "$ROOT_DIR/wallet-ui" && npm i >/dev/null )
 ( cd "$ROOT_DIR/dwp-portal" && npm i >/dev/null )
 
+echo "▶ Clearing stale Node services..."
+pkill -f "mock-consent-api.js" >/dev/null 2>&1 || true
+pkill -f "gatekeeper.js" >/dev/null 2>&1 || true
+pkill -f "dwp-service.js" >/dev/null 2>&1 || true
+
 echo "▶ Starting backend services (background)..."
 start_service consent-api npm run consent-api
 start_service gatekeeper  npm run gatekeeper
