@@ -1,12 +1,14 @@
 import React, { useEffect, useMemo, useState } from 'react';
 
 type ConsentReq = { rp:string; caseId:string; citizenId:string; scopes:string[]; issuedAt:string; consentId:string };
+type ActiveConsent = { rp:string; caseId:string; citizenId:string; scopes:string[]; expiresAt?:string; grantedAt?:string };
 type HistoryItem = { caseId:string; action:'granted'|'revoked'; at:string };
 
 const citizenId = 'nhs-999';
 
 export default function App(){
   const [pending, setPending] = useState<ConsentReq[]>([]);
+  const [active, setActive] = useState<ActiveConsent[]>([]);
   const [status, setStatus] = useState<string>('idle');
   const [history, setHistory] = useState<HistoryItem[]>([]);
 
@@ -14,7 +16,11 @@ export default function App(){
     const r = await fetch(`http://localhost:4000/consent/pending?citizenId=${citizenId}`);
     setPending(await r.json());
   }
-  useEffect(()=>{ loadPending(); const t=setInterval(loadPending, 1200); return ()=>clearInterval(t); },[]);
+  async function loadActive(){
+    const r = await fetch(`http://localhost:4000/consent/active?citizenId=${citizenId}`);
+    setActive(await r.json());
+  }
+  useEffect(()=>{ loadPending(); loadActive(); const t=setInterval(()=>{loadPending(); loadActive();}, 1200); return ()=>clearInterval(t); },[]);
 
   function record(action:HistoryItem['action'], caseId:string){
     setHistory((h)=>[{ caseId, action, at:new Date().toISOString() }, ...h].slice(0, 5));
@@ -27,7 +33,7 @@ export default function App(){
     });
     setStatus(`granted case ${caseId}`);
     record('granted', caseId);
-    await loadPending();
+    await Promise.all([loadPending(), loadActive()]);
   }
   async function revoke(caseId:string){
     await fetch('http://localhost:4000/consent/revoke', {
@@ -36,7 +42,7 @@ export default function App(){
     });
     setStatus(`revoked case ${caseId}`);
     record('revoked', caseId);
-    await loadPending();
+    await Promise.all([loadPending(), loadActive()]);
   }
 
   const highlight = useMemo(()=>pending[0], [pending]);
@@ -92,6 +98,31 @@ export default function App(){
           ))}
         </div>
         <p style={{marginTop:12}}>Status: <strong>{status}</strong></p>
+      </div>
+
+      <div className="gov-box" style={{marginTop:16}}>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:8}}>
+          <h2 style={{margin:0}}>Active consents</h2>
+          <small style={{color:'#666'}}>Revoke anytime</small>
+        </div>
+        {active.length === 0 && <p>No active sharing for your data.</p>}
+        <div style={{display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(260px, 1fr))', gap:12}}>
+          {active.map(consent => (
+            <div key={`${consent.caseId}-${consent.rp}`} className="request" style={{border:'1px solid #dcdcdc', borderRadius:10, padding:12}}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+                <div><strong>{consent.rp.toUpperCase()}</strong> · Case {consent.caseId}</div>
+                <span style={{background:'#e7f0fb', color:'#0b56d0', padding:'4px 8px', borderRadius:6, fontSize:12}}>Active</span>
+              </div>
+              <div style={{margin:'8px 0', color:'#555'}}>Sharing: <strong>{(consent.scopes || ['prescriptions']).join(', ')}</strong></div>
+              <div style={{fontSize:12, color:'#6c6f73'}}>Granted: {consent.grantedAt ? new Date(consent.grantedAt).toLocaleString() : 'n/a'}</div>
+              <div style={{fontSize:12, color:'#6c6f73'}}>Expires: {consent.expiresAt ? new Date(consent.expiresAt).toLocaleDateString() : '—'}</div>
+              <div style={{marginTop:10, display:'flex', gap:8}}>
+                <button className="btn-revoke" onClick={()=>revoke(consent.caseId)}>Revoke now</button>
+                <button className="btn-allow" onClick={()=>grant(consent.caseId)}>Extend 90 days</button>
+              </div>
+            </div>
+          ))}
+        </div>
       </div>
 
       <div className="gov-box" style={{marginTop:16}}>
