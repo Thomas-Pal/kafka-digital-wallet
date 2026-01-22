@@ -1,6 +1,6 @@
 import express from 'express';
 import { CONSENT_TOPIC, groupId, RUN_ID } from './config.js';
-import { createKafka, viewTopic } from './lib/kafka.js';
+import { createKafka, waitForBroker, viewTopic } from './lib/kafka.js';
 import { allowAll } from './utils/cors.js';
 
 const app = express();
@@ -9,6 +9,7 @@ app.use(allowAll);
 
 const cases = new Map(); // caseId -> { caseId, citizenId, status, scopes, view: [] }
 const kafka = createKafka(`dwp-service-${RUN_ID}`);
+await waitForBroker(kafka);
 
 const consent = kafka.consumer({ groupId: groupId('dwp-consent-status') });
 await consent.connect();

@@ -74,9 +74,9 @@ done
 echo "2) Create demo topics"
 bash "$ROOT_DIR/scripts/topics-create.sh"
 
-echo "3) Install npm deps (services, wallet-ui, dwp-portal)"
+echo "3) Install npm deps (services, apps/wallet, dwp-portal)"
 (cd services && npm install)
-(cd wallet-ui && npm install)
+(cd apps/wallet && npm install)
 (cd dwp-portal && npm install)
 
 echo "4) Start backend services"
@@ -86,7 +86,7 @@ run_bg dwp-api "cd '$ROOT_DIR/services' && npm run dwp"
 
 sleep 2
 echo "5) Start UIs (Vite dev servers)"
-run_bg wallet-ui "cd '$ROOT_DIR/wallet-ui' && npm run dev -- --host --port 5173"
+run_bg wallet-ui "cd '$ROOT_DIR/apps/wallet' && npm run dev -- --host --port 5173"
 run_bg dwp-portal "cd '$ROOT_DIR/dwp-portal' && npm run dev -- --host --port 5174"
 
 echo "6) Seed RAW prescriptions"

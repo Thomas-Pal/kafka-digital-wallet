@@ -5,7 +5,7 @@ podman compose up -d
 chmod +x demo.sh
 ./demo.sh
 # Open:
-#  Wallet: http://localhost:5173  (click "Grant consent")
+#  Wallet (Ionic React): http://localhost:5173
 #  DWP:    http://localhost:5174  (Refresh → Load view)
 #  Kafka:  http://localhost:8080
 
@@ -20,6 +20,10 @@ Run:
 chmod +x demo.sh scripts/*.sh
 ./demo.sh
 ```
+Wallet (Ionic React): http://localhost:5173
+Use “Requests” tab to emit demo consent requests.
+Use “Wallet” tab to Grant the two scenarios.
+Use “Consents” tab to view/revoke.
 
 Flow:
 
@@ -42,7 +46,7 @@ Notes:
 
 URLs:
 
-Wallet: http://localhost:5173
+Wallet (Ionic React): http://localhost:5173
 
 DWP Portal: http://localhost:5174
 

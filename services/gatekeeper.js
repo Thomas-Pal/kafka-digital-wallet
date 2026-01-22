@@ -1,7 +1,8 @@
-import { RAW_TOPIC, CONSENT_TOPIC, groupId, RUN_ID } from './config.js';
-import { createKafka, viewTopic } from './lib/kafka.js';
+import { CONSENT_TOPIC, groupId, RUN_ID } from './config.js';
+import { createKafka, waitForBroker, viewTopic } from './lib/kafka.js';
 
 const k = createKafka(`gatekeeper-${RUN_ID}`);
+await waitForBroker(k);
 const producer = k.producer();
 await producer.connect();
 console.log(`[gatekeeper][${RUN_ID}] connected to Kafka, waiting for consent + RAW...`);
@@ -19,7 +20,7 @@ const indexCitizen = (key, citizenId) => {
 // consume consent
 const consent = k.consumer({ groupId: groupId('gatekeeper-consent') });
 await consent.connect();
-await consent.subscribe({ topic: CONSENT_TOPIC, fromBeginning:true });
+await consent.subscribe({ topic: CONSENT_TOPIC, fromBeginning: true });
 consent.run({
   eachMessage: async ({ message }) => {
     const evt = JSON.parse(message.value.toString());
@@ -41,35 +42,54 @@ consent.run({
 });
 
 // consume RAW and forward if permitted
+const rawTopics = [
+  'nhs.raw.prescriptions',
+  'employment.termination',
+  'hmrc.p45.summary'
+];
 const raw = k.consumer({ groupId: groupId('gatekeeper-raw') });
 await raw.connect();
-await raw.subscribe({ topic: RAW_TOPIC, fromBeginning:true });
+for (const topic of rawTopics) {
+  await raw.subscribe({ topic, fromBeginning: true });
+}
 
 raw.run({
-  eachMessage: async ({ message }) => {
-    const e = JSON.parse(message.value.toString()); // { patientId, recordedAt, prescription:{...} }
-    const keys = Array.from(casesByCitizen.get(e.patientId) || []);
+  eachMessage: async ({ topic, message }) => {
+    const e = JSON.parse(message.value.toString());
+    const citizenId = e.patientId || e.citizenId || e.personId;
+    const keys = Array.from(casesByCitizen.get(citizenId) || []);
     if (keys.length === 0) {
-      console.log('[drop] no consent for', e.patientId);
+      console.log('[drop] no consent for', citizenId);
       return;
     }
 
+    const requiredScope =
+      topic === 'nhs.raw.prescriptions'
+        ? 'nhs.prescriptions'
+        : topic === 'employment.termination'
+          ? 'employment.termination'
+          : 'hmrc.p45.summary';
+
     for (const k of keys) {
       const c = consentStore.get(k);
-      const [, caseId, citizenId] = k.split('|');
-      if (!c) { console.log('[drop] no consent for', e.patientId); continue; }
+      const [, caseId, consentCitizenId] = k.split('|');
+      if (!c) { console.log('[drop] no consent for', citizenId); continue; }
       if (!c.active) { console.log('[drop] inactive consent', k); continue; }
       if (c.expiresAt && new Date(c.expiresAt) < new Date()) { console.log('[drop] expired', k); continue; }
-      if (!c.scopes.has('prescriptions')) { console.log('[drop] scope miss', k, [...c.scopes]); continue; }
-      if (citizenId !== e.patientId) { console.log('[drop] no consent for', e.patientId); continue; }
+      if (!c.scopes.has(requiredScope)) { console.log('[drop] scope miss', k, [...c.scopes]); continue; }
+      if (consentCitizenId !== citizenId) { console.log('[drop] no consent for', citizenId); continue; }
 
-      const topic = viewTopic(caseId, citizenId);
+      const view = viewTopic(caseId, consentCitizenId);
       const rp = 'dwp';
+      const payload =
+        topic === 'nhs.raw.prescriptions'
+          ? { citizenId: consentCitizenId, rp, caseId, prescription: e.prescription, at: new Date().toISOString() }
+          : { citizenId: consentCitizenId, rp, caseId, event: e, at: new Date().toISOString() };
       await producer.send({
-        topic,
-        messages: [{ key: citizenId, value: JSON.stringify({ citizenId, rp, caseId, prescription: e.prescription, at: new Date().toISOString() }) }]
+        topic: view,
+        messages: [{ key: consentCitizenId, value: JSON.stringify(payload) }]
       });
-      console.log('[view]', topic, '→', e.patientId, e.prescription);
+      console.log('[view]', view, '→', citizenId);
     }
   }
 });

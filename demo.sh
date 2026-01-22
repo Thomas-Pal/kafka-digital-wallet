@@ -26,13 +26,9 @@ if [[ "$OS" == "Darwin" ]]; then
   fi
 fi
 
-echo "▶ Killing stale processes on ports (4000,5001,5173,5174)..."
-for port in 4000 5001 5173 5174; do
-  if command -v fuser >/dev/null; then
-    fuser -k "${port}/tcp" 2>/dev/null || true
-  elif command -v lsof >/dev/null; then
-    lsof -ti tcp:"${port}" 2>/dev/null | xargs -r kill -9 || true
-  fi
+echo "▶ Killing stale processes on ports (4000,5001,5002,5173,5174)..."
+for p in 4000 5001 5002 5173 5174; do
+  pid=$(lsof -t -i tcp:$p) && kill -9 $pid || true
 done
 pkill -f "mock-consent-api.js" >/dev/null 2>&1 || true
 pkill -f "gatekeeper.js" >/dev/null 2>&1 || true
@@ -83,12 +79,16 @@ if [[ -z "$healthy" ]]; then
 fi
 
 echo "▶ Creating topics..."
-podman exec kafka kafka-topics --bootstrap-server 127.0.0.1:29092 --create --if-not-exists --topic nhs.raw.prescriptions --partitions 1 --replication-factor 1 || true
-podman exec kafka kafka-topics --bootstrap-server 127.0.0.1:29092 --create --if-not-exists --topic consent.events --partitions 1 --replication-factor 1 || true
+podman exec kafka bash -lc '
+  for t in nhs.raw.prescriptions consent.events employment.termination hmrc.p45.summary; do
+    kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic $t --partitions 1 --replication-factor 1
+  done
+  kafka-topics --bootstrap-server localhost:9092 --list
+'
 
 echo "▶ Installing dependencies..."
 ( cd "$ROOT_DIR/services" && npm i >/dev/null )
-( cd "$ROOT_DIR/wallet-ui" && npm i >/dev/null )
+( cd "$ROOT_DIR/apps/wallet" && npm i >/dev/null )
 ( cd "$ROOT_DIR/dwp-portal" && npm i >/dev/null )
 
 echo "▶ Starting backend services (background)..."
@@ -97,7 +97,7 @@ start_service gatekeeper  npm run gatekeeper
 start_service dwp        npm run dwp
 
 echo "▶ Starting UIs (Wallet 5173, DWP 5174) ..."
-( cd "$ROOT_DIR/wallet-ui" && nohup npm run dev -- --port 5173 >"$LOG_DIR/wallet.log" 2>&1 & )
+( cd "$ROOT_DIR/apps/wallet" && nohup npm run dev -- --port 5173 >"$LOG_DIR/wallet.log" 2>&1 & )
 ( cd "$ROOT_DIR/dwp-portal" && nohup npm run dev -- --port 5174  >"$LOG_DIR/portal.log" 2>&1 & )
 sleep 2
 
@@ -112,7 +112,7 @@ echo "Press ENTER to send a DWP consent REQUEST (case 9001 / citizen nhs-999)...
 read -r
 curl -s -X POST http://localhost:4000/consent/request \
   -H 'content-type: application/json' \
-  -d '{"rp":"dwp","caseId":"9001","citizenId":"nhs-999","scopes":["prescriptions"]}' | jq .
+  -d '{"rp":"dwp","caseId":"9001","citizenId":"nhs-999","scopes":["nhs.prescriptions"]}' | jq .
 
 echo
 echo "🔔 Approve in the Wallet UI, then press ENTER..."
@@ -126,7 +126,7 @@ if [ "$GRANT_FOUND" -eq 0 ]; then
   echo "❌ No grant found. Forcing a grant now..."
   curl -s -X POST http://localhost:4000/consent/grant \
     -H 'content-type: application/json' \
-    -d '{"rp":"dwp","caseId":"9001","citizenId":"nhs-999","scopes":["prescriptions"],"ttlDays":90}' >/dev/null
+    -d '{"rp":"dwp","caseId":"9001","citizenId":"nhs-999","scopes":["nhs.prescriptions"],"ttlDays":90}' >/dev/null
   sleep 1
 fi
 
