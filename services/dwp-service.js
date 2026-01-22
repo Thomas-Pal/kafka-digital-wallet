@@ -8,6 +8,7 @@ app.use(express.json());
 app.use(allowAll);
 
 const cases = new Map();
+const seenMessages = new Set();
 const kafka = createKafka(`dwp-service-${RUN_ID}`);
 await waitForBroker(kafka);
 
@@ -18,6 +19,11 @@ await consumer.subscribe({ topic: /^views\.permitted\.dwp\..+$/, fromBeginning: 
 await consumer.run({
   eachMessage: async ({ topic, message }) => {
     const payload = JSON.parse(message.value.toString());
+    const signature = JSON.stringify(payload);
+    if (seenMessages.has(signature)) {
+      return;
+    }
+    seenMessages.add(signature);
     const caseId = payload.caseId || 'unknown';
     const entry = cases.get(caseId) || {
       caseId,
