@@ -1,9 +1,10 @@
 export type Scope =
-  | 'nhs.prescriptions'
-  | 'employment.termination'
-  | 'hmrc.p45.summary';
+  | 'share:dwp:uc'
+  | 'share:dwp:disability'
+  | 'share:coach:basic'
+  | 'share:nhs:prescriptions';
 
-export type RelyingParty = 'dwp' | 'hmrc';
+export type RelyingParty = 'dwp' | 'hmrc' | 'coach';
 
 export interface ConsentRequest {
   id: string;

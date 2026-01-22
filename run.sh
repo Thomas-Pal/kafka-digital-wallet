@@ -23,9 +23,10 @@ echo "▶ Install Node deps (wallet, dwp, services)..."
 echo "▶ Start backend services (bg)..."
 # Clean any prior pids on 4000/5001/5002
 lsof -ti:4000,5001,5002 | xargs -r kill -9 || true
-( cd services && RUN_ID=$RANDOM nohup npm run consent-api > ../logs/consent-api.log 2>&1 & )
+( cd services && RUN_ID=$RANDOM nohup npm run orchestration-api > ../logs/orchestration-api.log 2>&1 & )
 ( cd services && RUN_ID=$RANDOM nohup npm run gatekeeper  > ../logs/gatekeeper.log  2>&1 & )
-( cd services && RUN_ID=$RANDOM nohup npm run demo-sim    > ../logs/demo-sim.log    2>&1 & )
+( cd services && RUN_ID=$RANDOM nohup npm run hmrc-api     > ../logs/hmrc-api.log     2>&1 & )
+( cd services && RUN_ID=$RANDOM nohup npm run coach-api    > ../logs/coach-api.log    2>&1 & )
 
 echo "▶ Start UIs (wallet 5173, dwp 5174)..."
 lsof -ti:5173,5174 | xargs -r kill -9 || true

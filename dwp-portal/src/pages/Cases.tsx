@@ -9,13 +9,10 @@ const badgeStyle: Record<CaseRow['consent'], { background: string; label: string
 };
 
 export default function Cases() {
-  const [rows, setRows] = useState<CaseRow[]>([
-    { caseId: '9001', citizenId: 'nhs-999', type: 'nhs', consent: 'pending' },
-    { caseId: 'TERM-1001', citizenId: 'emp-999', type: 'termination', consent: 'pending' }
-  ]);
+  const [rows, setRows] = useState<CaseRow[]>([]);
   useEffect(() => {
     const t = setInterval(async () => {
-      const r = await fetch('http://localhost:5001/api/consent-status').then((x) => x.json()).catch(() => ({}));
+      const r = await fetch('http://localhost:5001/api/cases').then((x) => x.json()).catch(() => ({}));
       if (r && Array.isArray(r)) setRows(r);
     }, 2000);
     return () => clearInterval(t);

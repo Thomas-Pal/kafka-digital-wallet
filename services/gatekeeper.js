@@ -7,25 +7,26 @@ const producer = k.producer();
 await producer.connect();
 console.log(`[gatekeeper][${RUN_ID}] connected to Kafka, waiting for consent + RAW...`);
 
-// key: "citizen|rp|scope|case" -> { citizenId, rp, scope, caseId, active, expiresAt }
+// key: "citizen|rp|scope" -> { citizenId, rp, scope, caseId, active, expiresAt }
 const consentStore = new Map();
-const consentsByCitizen = new Map();
-const keyFor = (citizenId, rp, scope, caseId) => `${citizenId}|${rp}|${scope}|${caseId}`;
-const indexConsent = (citizenId, key) => {
-  const set = consentsByCitizen.get(citizenId) || new Set();
-  set.add(key);
-  consentsByCitizen.set(citizenId, set);
+const keyFor = (citizenId, rp, scope) => `${citizenId}|${rp}|${scope}`;
+
+const setConsent = ({ citizenId, rp, scope, caseId, active, expiresAt }) => {
+  consentStore.set(keyFor(citizenId, rp, scope), {
+    citizenId,
+    rp,
+    scope,
+    caseId,
+    active,
+    expiresAt
+  });
 };
 
-const findConsents = (citizenId, rp, scope) => {
-  const keys = Array.from(consentsByCitizen.get(citizenId) || []);
-  const now = Date.now();
-  return keys
-    .map((k) => consentStore.get(k))
-    .filter(Boolean)
-    .filter((c) => c.rp === rp && c.scope === scope)
-    .filter((c) => c.active)
-    .filter((c) => !c.expiresAt || new Date(c.expiresAt).getTime() >= now);
+const hasConsent = (citizenId, rp, scope) => {
+  const entry = consentStore.get(keyFor(citizenId, rp, scope));
+  if (!entry || !entry.active) return false;
+  if (entry.expiresAt && new Date(entry.expiresAt) < new Date()) return false;
+  return entry;
 };
 
 // consume consent
@@ -35,38 +36,29 @@ await consent.subscribe({ topic: CONSENT_TOPIC, fromBeginning: true });
 consent.run({
   eachMessage: async ({ message }) => {
     const evt = JSON.parse(message.value.toString());
-    const { rp = 'dwp', caseId, citizenId, scopes = [], expiresAt } = evt;
+    const { rp = 'dwp', caseId, citizenId, scope, expiresAt } = evt;
 
-    if (evt.eventType === 'grant') {
-      scopes.forEach((scope) => {
-        const key = keyFor(citizenId, rp, scope, caseId);
-        consentStore.set(key, { citizenId, rp, scope, caseId, active: true, expiresAt });
-        indexConsent(citizenId, key);
-      });
-      console.log('[consent] grant', citizenId, caseId, scopes);
+    if (evt.eventType === 'granted') {
+      setConsent({ citizenId, rp, scope, caseId, active: true, expiresAt });
+      console.log('[consent] grant', citizenId, rp, scope, caseId);
       return;
     }
 
-    if (evt.eventType === 'revoke') {
-      const keys = Array.from(consentsByCitizen.get(citizenId) || []);
-      keys.forEach((key) => {
-        const c = consentStore.get(key);
-        if (!c || c.rp !== rp || c.caseId !== caseId) return;
-        consentStore.set(key, { ...c, active: false, expiresAt: expiresAt || new Date(0).toISOString() });
-      });
-      console.log('[consent] revoke', citizenId, caseId);
+    if (evt.eventType === 'revoked') {
+      setConsent({ citizenId, rp, scope, caseId, active: false, expiresAt: expiresAt || new Date(0).toISOString() });
+      console.log('[consent] revoke', citizenId, rp, scope, caseId);
       return;
     }
 
-    if (evt.eventType === 'request') {
-      console.log('[consent] request', citizenId, caseId);
+    if (evt.eventType === 'requested') {
+      console.log('[consent] request', citizenId, rp, scope, caseId);
     }
   }
 });
 
 // consume RAW and forward if permitted
 const rawTopics = [
-  'nhs.raw.prescriptions',
+  'nhs.prescriptions',
   'employment.termination',
   'hmrc.p45.summary'
 ];
@@ -79,37 +71,103 @@ for (const topic of rawTopics) {
 raw.run({
   eachMessage: async ({ topic, message }) => {
     const evt = JSON.parse(message.value.toString());
-    const citizenId = evt.citizenId || evt.patientId || evt.personId;
+    const citizenId = evt.citizenId;
     if (!citizenId) return;
 
-    const scope =
-      topic === 'nhs.raw.prescriptions'
-        ? 'nhs.prescriptions'
-        : 'employment.termination';
+    if (topic === 'employment.termination') {
+      const dwpConsent = hasConsent(citizenId, 'dwp', 'share:dwp:uc');
+      if (dwpConsent) {
+        await producer.send({
+          topic: 'views.permitted.dwp.uc',
+          messages: [{
+            key: citizenId,
+            value: JSON.stringify({
+              citizenId,
+              caseId: dwpConsent.caseId || 'uc-9001',
+              source: 'employment',
+              payload: {
+                terminationDate: evt.terminationDate,
+                reasonCode: evt.reasonCode,
+                weeklyHours: evt.weeklyHours,
+                annualSalary: evt.annualSalary,
+                employerId: evt.employerId
+              },
+              emittedAt: new Date().toISOString()
+            })
+          }]
+        });
+      }
 
-    const candidates = findConsents(citizenId, 'dwp', scope);
-    if (candidates.length === 0) {
-      console.log('[drop] no consent for', citizenId);
+      const coachConsent = hasConsent(citizenId, 'coach', 'share:coach:basic');
+      if (coachConsent) {
+        await producer.send({
+          topic: 'views.permitted.coach.basic',
+          messages: [{
+            key: citizenId,
+            value: JSON.stringify({
+              citizenId,
+              source: 'employment',
+              payload: {
+                reasonCode: evt.reasonCode,
+                terminationDate: evt.terminationDate
+              },
+              emittedAt: new Date().toISOString()
+            })
+          }]
+        });
+      }
       return;
     }
 
-    for (const c of candidates) {
-      const viewTopic = `views.permitted.dwp.${c.caseId}.${scope}`;
+    if (topic === 'hmrc.p45.summary') {
+      const dwpConsent = hasConsent(citizenId, 'dwp', 'share:dwp:uc');
+      if (!dwpConsent) return;
       await producer.send({
-        topic: viewTopic,
+        topic: 'views.permitted.dwp.uc',
         messages: [{
           key: citizenId,
           value: JSON.stringify({
-            caseId: c.caseId,
-            rp: 'dwp',
-            scope,
             citizenId,
-            data: evt,
-            routedAt: new Date().toISOString()
+            caseId: dwpConsent.caseId || 'uc-9001',
+            source: 'hmrc',
+            payload: {
+              p45Number: evt.p45Number,
+              taxCode: evt.taxCode,
+              ytdGross: evt.ytdGross,
+              ytdTax: evt.ytdTax,
+              issuedAt: evt.issuedAt
+            },
+            emittedAt: new Date().toISOString()
           })
         }]
       });
-      console.log('[view]', viewTopic, '→', citizenId);
+      return;
+    }
+
+    if (topic === 'nhs.prescriptions') {
+      const dwpConsent = hasConsent(citizenId, 'dwp', 'share:dwp:disability');
+      const nhsConsent = hasConsent(citizenId, 'dwp', 'share:nhs:prescriptions');
+      if (!dwpConsent || !nhsConsent) return;
+      await producer.send({
+        topic: 'views.permitted.dwp.disability',
+        messages: [{
+          key: citizenId,
+          value: JSON.stringify({
+            citizenId,
+            caseId: dwpConsent.caseId || 'dis-9002',
+            source: 'nhs',
+            payload: {
+              drug: evt.drug,
+              dosage: evt.dosage,
+              frequency: evt.frequency,
+              prescribedAt: evt.prescribedAt,
+              gpOdsCode: evt.gpOdsCode,
+              repeat: evt.repeat
+            },
+            emittedAt: new Date().toISOString()
+          })
+        }]
+      });
     }
   }
 });

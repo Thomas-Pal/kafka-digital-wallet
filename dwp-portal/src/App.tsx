@@ -46,11 +46,11 @@ function CaseDetail({ caseId }: { caseId: string }) {
 
       <div style={{ display: 'grid', gap: 16 }}>
         {rows.map((row, i) => {
-          const data = row.v?.data || {};
-          const eventType = data.eventType || row.v?.scope;
-          const isNhs = eventType === 'nhs.prescription.issued' || row.v?.scope === 'nhs.prescriptions';
-          const isTermination = eventType === 'employment.termination';
-          const isP45 = eventType === 'hmrc.p45.summary';
+          const data = row.v?.payload || {};
+          const eventType = row.v?.source || 'event';
+          const isNhs = eventType === 'nhs';
+          const isTermination = eventType === 'employment';
+          const isP45 = eventType === 'hmrc';
 
           return (
             <div key={`${row.ts}-${i}`} style={{ border: '1px solid #e1e1e1', borderRadius: 12, padding: 16 }}>
@@ -59,33 +59,32 @@ function CaseDetail({ caseId }: { caseId: string }) {
 
               {isNhs && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))', gap: 12 }}>
-                  <Info label="Drug" value={data.drugName || '—'} />
-                  <Info label="Dose (mg)" value={data.doseMg ?? '—'} />
-                  <Info label="Quantity" value={data.quantity ?? '—'} />
-                  <Info label="SNOMED" value={data.snomedCode || '—'} />
-                  <Info label="Prescriber" value={data.prescriberId || '—'} />
-                  <Info label="Practice" value={data.gpPracticeName || '—'} />
+                  <Info label="Drug" value={data.drug || '—'} />
+                  <Info label="Dosage" value={data.dosage ?? '—'} />
+                  <Info label="Frequency" value={data.frequency ?? '—'} />
+                  <Info label="Prescribed At" value={data.prescribedAt || '—'} />
+                  <Info label="GP ODS" value={data.gpOdsCode || '—'} />
+                  <Info label="Repeat" value={data.repeat ?? '—'} />
                 </div>
               )}
 
               {isTermination && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-                  <Info label="Employer" value={data.employerName || '—'} />
+                  <Info label="Employer" value={data.employerId || '—'} />
                   <Info label="Reason" value={data.reasonCode || '—'} />
-                  <Info label="Notice (weeks)" value={data.noticeWeeks ?? '—'} />
-                  <Info label="Redundancy Pay" value={data.redundancyPay ?? '—'} />
-                  <Info label="Avg Weekly Earnings" value={data.avgWeeklyEarnings ?? '—'} />
+                  <Info label="Weekly Hours" value={data.weeklyHours ?? '—'} />
+                  <Info label="Annual Salary" value={data.annualSalary ?? '—'} />
                   <Info label="Termination Date" value={data.terminationDate || '—'} />
                 </div>
               )}
 
               {isP45 && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 12 }}>
-                  <Info label="Employer" value={data.employerName || '—'} />
-                  <Info label="Pay YTD" value={data.payYTD ?? '—'} />
-                  <Info label="Tax YTD" value={data.taxYTD ?? '—'} />
+                  <Info label="P45 Number" value={data.p45Number || '—'} />
+                  <Info label="Pay YTD" value={data.ytdGross ?? '—'} />
+                  <Info label="Tax YTD" value={data.ytdTax ?? '—'} />
                   <Info label="Tax Code" value={data.taxCode || '—'} />
-                  <Info label="Leaving Date" value={data.leavingDate || '—'} />
+                  <Info label="Issued At" value={data.issuedAt || '—'} />
                 </div>
               )}
 

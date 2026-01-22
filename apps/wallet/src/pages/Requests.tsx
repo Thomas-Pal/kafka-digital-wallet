@@ -30,9 +30,9 @@ export default function Requests() {
   }, []);
 
   const grouped = recs.reduce<Record<string, ConsentRequest[]>>((acc, r) => {
-    const key = r.scopes.includes('nhs.prescriptions')
+    const key = r.scopes.includes('share:nhs:prescriptions')
       ? 'Health'
-      : r.scopes.includes('employment.termination')
+      : r.scopes.includes('share:dwp:uc')
         ? 'Work & Benefits'
         : 'Other';
     (acc[key] ||= []).push(r);
