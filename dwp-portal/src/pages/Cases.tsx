@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import React, { useEffect, useState } from 'react';
 
 type CaseRow = { caseId: string; citizenId: string; type: 'nhs' | 'termination'; consent: 'pending' | 'granted' | 'expired' };
 
