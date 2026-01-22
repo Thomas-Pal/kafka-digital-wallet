@@ -25,6 +25,7 @@ echo "▶ Start backend services (bg)..."
 lsof -ti:4000,5001,5002 | xargs -r kill -9 || true
 ( cd services && RUN_ID=$RANDOM nohup npm run orchestration-api > ../logs/orchestration-api.log 2>&1 & )
 ( cd services && RUN_ID=$RANDOM nohup npm run gatekeeper  > ../logs/gatekeeper.log  2>&1 & )
+( cd services && RUN_ID=$RANDOM nohup npm run dwp        > ../logs/dwp-api.log    2>&1 & )
 ( cd services && RUN_ID=$RANDOM nohup npm run hmrc-api     > ../logs/hmrc-api.log     2>&1 & )
 ( cd services && RUN_ID=$RANDOM nohup npm run coach-api    > ../logs/coach-api.log    2>&1 & )
 
