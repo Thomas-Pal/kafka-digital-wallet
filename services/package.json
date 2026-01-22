@@ -7,12 +7,14 @@
     "cors": "^2.8.5",
     "express": "^4.19.2",
     "kafkajs": "^2.2.4",
+    "node-fetch": "^3.3.2",
     "uuid": "^9.0.1"
   },
   "scripts": {
     "consent-api": "node mock-consent-api.js",
     "gatekeeper": "node gatekeeper.js",
     "dwp": "node dwp-service.js",
+    "demo-sim": "node demo-sim.js",
     "produce:nhs": "node mock-nhs-producer.js"
   }
 }
