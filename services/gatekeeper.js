@@ -9,6 +9,7 @@ console.log(`[gatekeeper][${RUN_ID}] connected to Kafka, waiting for consent + R
 
 // key: "citizen|rp|scope" -> { citizenId, rp, scope, caseId, active, expiresAt }
 const consentStore = new Map();
+const seenRaw = new Set();
 const keyFor = (citizenId, rp, scope) => `${citizenId}|${rp}|${scope}`;
 
 const setConsent = ({ citizenId, rp, scope, caseId, active, expiresAt }) => {
@@ -73,6 +74,11 @@ raw.run({
     const evt = JSON.parse(message.value.toString());
     const citizenId = evt.citizenId;
     if (!citizenId) return;
+    const rawSignature = evt.eventId || `${topic}|${citizenId}|${JSON.stringify(evt)}`;
+    if (seenRaw.has(rawSignature)) {
+      return;
+    }
+    seenRaw.add(rawSignature);
 
     if (topic === 'employment.termination') {
       const dwpConsent = hasConsent(citizenId, 'dwp', 'share:dwp:uc');

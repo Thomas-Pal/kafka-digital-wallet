@@ -209,19 +209,22 @@ app.post('/api/approve', async (req, res) => {
 });
 
 app.post('/triggers/employment-termination', async (req, res) => {
-  const evt = TerminationEvent(req.body || {});
+  const eventId = uuid();
+  const evt = TerminationEvent({ eventId, ...(req.body || {}) });
   await producer.send({ topic: 'employment.termination', messages: [{ key: evt.citizenId, value: JSON.stringify(evt) }] });
   res.json({ ok: true, evt });
 });
 
 app.post('/triggers/prescription-change', async (req, res) => {
-  const evt = PrescriptionEvent(req.body || {});
+  const eventId = uuid();
+  const evt = PrescriptionEvent({ eventId, ...(req.body || {}) });
   await producer.send({ topic: 'nhs.prescriptions', messages: [{ key: evt.citizenId, value: JSON.stringify(evt) }] });
   res.json({ ok: true, evt });
 });
 
 app.post('/triggers/p45', async (req, res) => {
-  const evt = P45SummaryEvent(req.body || {});
+  const eventId = uuid();
+  const evt = P45SummaryEvent({ eventId, ...(req.body || {}) });
   await producer.send({ topic: 'hmrc.p45.summary', messages: [{ key: evt.citizenId, value: JSON.stringify(evt) }] });
   res.json({ ok: true, evt });
 });

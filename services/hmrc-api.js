@@ -19,7 +19,7 @@ await consumer.run({
     const signature = `${evt.citizenId}|${evt.terminationDate}|${evt.employerId}|${evt.reasonCode}`;
     if (seenTerminations.has(signature)) return;
     seenTerminations.add(signature);
-    const p45 = P45SummaryEvent({ citizenId: evt.citizenId });
+    const p45 = P45SummaryEvent({ citizenId: evt.citizenId, eventId: `p45-${signature}` });
     await producer.send({ topic: 'hmrc.p45.summary', messages: [{ key: p45.citizenId, value: JSON.stringify(p45) }] });
     console.log('[hmrc] emitted p45 for', p45.citizenId);
   }
