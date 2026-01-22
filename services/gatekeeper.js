@@ -1,7 +1,8 @@
 import { RAW_TOPIC, CONSENT_TOPIC, groupId, RUN_ID } from './config.js';
-import { createKafka, viewTopic } from './lib/kafka.js';
+import { createKafka, waitForBroker, viewTopic } from './lib/kafka.js';
 
 const k = createKafka(`gatekeeper-${RUN_ID}`);
+await waitForBroker(k);
 const producer = k.producer();
 await producer.connect();
 console.log(`[gatekeeper][${RUN_ID}] connected to Kafka, waiting for consent + RAW...`);
@@ -19,7 +20,7 @@ const indexCitizen = (key, citizenId) => {
 // consume consent
 const consent = k.consumer({ groupId: groupId('gatekeeper-consent') });
 await consent.connect();
-await consent.subscribe({ topic: CONSENT_TOPIC, fromBeginning:true });
+await consent.subscribe({ topic: CONSENT_TOPIC, fromBeginning: true });
 consent.run({
   eachMessage: async ({ message }) => {
     const evt = JSON.parse(message.value.toString());
@@ -43,7 +44,7 @@ consent.run({
 // consume RAW and forward if permitted
 const raw = k.consumer({ groupId: groupId('gatekeeper-raw') });
 await raw.connect();
-await raw.subscribe({ topic: RAW_TOPIC, fromBeginning:true });
+await raw.subscribe({ topic: RAW_TOPIC, fromBeginning: true });
 
 raw.run({
   eachMessage: async ({ message }) => {
@@ -60,7 +61,7 @@ raw.run({
       if (!c) { console.log('[drop] no consent for', e.patientId); continue; }
       if (!c.active) { console.log('[drop] inactive consent', k); continue; }
       if (c.expiresAt && new Date(c.expiresAt) < new Date()) { console.log('[drop] expired', k); continue; }
-      if (!c.scopes.has('prescriptions')) { console.log('[drop] scope miss', k, [...c.scopes]); continue; }
+      if (!c.scopes.has('nhs.prescriptions')) { console.log('[drop] scope miss', k, [...c.scopes]); continue; }
       if (citizenId !== e.patientId) { console.log('[drop] no consent for', e.patientId); continue; }
 
       const topic = viewTopic(caseId, citizenId);

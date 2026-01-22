@@ -1,7 +1,7 @@
 import express from 'express';
 import { v4 as uuid } from 'uuid';
 import { CONSENT_TOPIC } from './config.js';
-import { createKafka } from './lib/kafka.js';
+import { createKafka, waitForBroker } from './lib/kafka.js';
 import { allowAll } from './utils/cors.js';
 
 const app = express();
@@ -9,6 +9,7 @@ app.use(express.json());
 app.use(allowAll);
 
 const k = createKafka('consent-api');
+await waitForBroker(k);
 const producer = k.producer();
 await producer.connect();
 
@@ -17,7 +18,7 @@ const pending = new Map(); // citizenId -> ConsentReq[]
 const active = new Map(); // citizenId -> ConsentGrant[]
 
 app.post('/consent/request', async (req, res) => {
-  const { rp='dwp', caseId, citizenId, scopes=['prescriptions'] } = req.body;
+  const { rp='dwp', caseId, citizenId, scopes=['nhs.prescriptions'] } = req.body;
   if (!caseId || !citizenId) return res.status(400).json({ ok:false, error:'caseId and citizenId required' });
   const evt = { eventType:'request', consentId:uuid(), rp, caseId, citizenId, scopes, issuedAt:new Date().toISOString() };
   await producer.send({ topic: CONSENT_TOPIC, messages:[{ key: citizenId, value:JSON.stringify(evt) }] });
@@ -37,7 +38,7 @@ app.get('/consent/active', (req, res) => {
 });
 
 app.post('/consent/grant', async (req, res) => {
-  const { rp='dwp', caseId, citizenId, scopes=['prescriptions'], ttlDays=90 } = req.body;
+  const { rp='dwp', caseId, citizenId, scopes=['nhs.prescriptions'], ttlDays=90 } = req.body;
   if (!caseId || !citizenId) return res.status(400).json({ ok:false, error:'caseId and citizenId required' });
   const filtered = (pending.get(citizenId) || []).filter(r => !(r.caseId===caseId && r.rp===rp));
   pending.set(citizenId, filtered);
