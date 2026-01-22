@@ -1,0 +1,8 @@
+{
+  "name": "kafka-digital-wallet",
+  "private": true,
+  "scripts": {
+    "wallet": "npm --prefix wallet-ui run dev",
+    "dwp-ui": "npm --prefix dwp-portal run dev"
+  }
+}
