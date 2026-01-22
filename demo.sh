@@ -26,6 +26,20 @@ if [[ "$OS" == "Darwin" ]]; then
   fi
 fi
 
+echo "▶ Killing stale processes on ports (4000,5001,5173,5174)..."
+for port in 4000 5001 5173 5174; do
+  if command -v fuser >/dev/null; then
+    fuser -k "${port}/tcp" 2>/dev/null || true
+  elif command -v lsof >/dev/null; then
+    lsof -ti tcp:"${port}" 2>/dev/null | xargs -r kill -9 || true
+  fi
+done
+pkill -f "mock-consent-api.js" >/dev/null 2>&1 || true
+pkill -f "gatekeeper.js" >/dev/null 2>&1 || true
+pkill -f "dwp-service.js" >/dev/null 2>&1 || true
+pkill -f "vite.*5173" >/dev/null 2>&1 || true
+pkill -f "vite.*5174" >/dev/null 2>&1 || true
+
 start_service() {
   local name="$1"; shift
   local logfile="$LOG_DIR/${name}.log"
@@ -69,18 +83,13 @@ if [[ -z "$healthy" ]]; then
 fi
 
 echo "▶ Creating topics..."
-chmod +x "$ROOT_DIR"/scripts/*.sh
-bash "$ROOT_DIR"/scripts/topics-create.sh
+podman exec kafka kafka-topics --bootstrap-server 127.0.0.1:29092 --create --if-not-exists --topic nhs.raw.prescriptions --partitions 1 --replication-factor 1 || true
+podman exec kafka kafka-topics --bootstrap-server 127.0.0.1:29092 --create --if-not-exists --topic consent.events --partitions 1 --replication-factor 1 || true
 
 echo "▶ Installing dependencies..."
 ( cd "$ROOT_DIR/services" && npm i >/dev/null )
 ( cd "$ROOT_DIR/wallet-ui" && npm i >/dev/null )
 ( cd "$ROOT_DIR/dwp-portal" && npm i >/dev/null )
-
-echo "▶ Clearing stale Node services..."
-pkill -f "mock-consent-api.js" >/dev/null 2>&1 || true
-pkill -f "gatekeeper.js" >/dev/null 2>&1 || true
-pkill -f "dwp-service.js" >/dev/null 2>&1 || true
 
 echo "▶ Starting backend services (background)..."
 start_service consent-api npm run consent-api
@@ -88,40 +97,49 @@ start_service gatekeeper  npm run gatekeeper
 start_service dwp        npm run dwp
 
 echo "▶ Starting UIs (Wallet 5173, DWP 5174) ..."
-pkill -f "vite.*5173" >/dev/null 2>&1 || true
-pkill -f "vite.*5174" >/dev/null 2>&1 || true
 ( cd "$ROOT_DIR/wallet-ui" && nohup npm run dev -- --port 5173 >"$LOG_DIR/wallet.log" 2>&1 & )
 ( cd "$ROOT_DIR/dwp-portal" && nohup npm run dev -- --port 5174  >"$LOG_DIR/portal.log" 2>&1 & )
 sleep 2
 
-echo ""
+echo
 echo "📺 Open:"
 echo "  - Wallet:     http://localhost:5173"
 echo "  - DWP Portal: http://localhost:5174"
 echo "  - Kafka UI:   http://localhost:8080"
-echo ""
-read -p "Press ENTER to send a DWP consent REQUEST (case 9001 / citizen nhs-999)..." _
 
+echo
+echo "Press ENTER to send a DWP consent REQUEST (case 9001 / citizen nhs-999)..."
+read -r
 curl -s -X POST http://localhost:4000/consent/request \
   -H 'content-type: application/json' \
-  -d '{"rp":"dwp","caseId":"9001","citizenId":"nhs-999","scopes":["prescriptions"]}' | jq . || true
+  -d '{"rp":"dwp","caseId":"9001","citizenId":"nhs-999","scopes":["prescriptions"]}' | jq .
 
-echo ""
-echo "🔔 In the Wallet, approve the request (Allow for 3 months)."
-read -p "Press ENTER AFTER you APPROVE in the Wallet..." _
+echo
+echo "🔔 Approve in the Wallet UI, then press ENTER..."
+read -r
 
-echo "▶ Publishing RAW now (post-consent so the view fills)..."
-bash "$ROOT_DIR"/scripts/seed-raw.sh
+echo "▶ Verifying GRANT exists..."
+GRANT_FOUND=$(podman exec kafka kafka-console-consumer --bootstrap-server 127.0.0.1:29092 \
+  --topic consent.events --from-beginning --timeout-ms 1500 2>/dev/null | grep -c '"eventType":"grant"' || true)
 
-echo ""
-echo "🔎 Checking DWP case view..."
-sleep 2
-curl -s http://localhost:5001/api/case/9001/view | jq . | head -n 40 || true
+if [ "$GRANT_FOUND" -eq 0 ]; then
+  echo "❌ No grant found. Forcing a grant now..."
+  curl -s -X POST http://localhost:4000/consent/grant \
+    -H 'content-type: application/json' \
+    -d '{"rp":"dwp","caseId":"9001","citizenId":"nhs-999","scopes":["prescriptions"],"ttlDays":90}' >/dev/null
+  sleep 1
+fi
 
-echo ""
-echo "✅ Demo ready. In DWP Portal:"
-echo "   - Case 9001 status should be 'granted'"
-echo "   - Opening Case 9001 shows filtered prescription rows"
-echo ""
-echo "Troubleshoot logs:"
-echo "  tail -n +1 $LOG_DIR/consent-api.log $LOG_DIR/gatekeeper.log $LOG_DIR/dwp.log"
+echo "▶ Publishing RAW now (post-consent)..."
+( cd "$ROOT_DIR/services" && npm run produce:nhs )
+
+echo
+echo "🔎 DWP case view (9001):"
+curl -s http://localhost:5001/api/case/9001/view | jq .
+
+echo
+echo "📺 Open (copy/paste):"
+echo "  Wallet: http://localhost:5173"
+echo "  DWP:    http://localhost:5174"
+echo "  Kafka:  http://localhost:8080"
+echo "Logs: tail -n +1 $LOG_DIR/consent-api.log $LOG_DIR/gatekeeper.log $LOG_DIR/dwp.log"
