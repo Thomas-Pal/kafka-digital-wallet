@@ -65,7 +65,7 @@ const rawTopics = [
 const raw = k.consumer({ groupId: groupId('gatekeeper-raw') });
 await raw.connect();
 for (const topic of rawTopics) {
-  await raw.subscribe({ topic, fromBeginning: true });
+  await raw.subscribe({ topic, fromBeginning: false });
 }
 
 raw.run({
