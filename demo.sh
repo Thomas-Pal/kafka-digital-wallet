@@ -30,9 +30,11 @@ echo "▶ Killing stale processes on ports (4000,5001,5002,5173,5174)..."
 for p in 4000 5001 5002 5173 5174; do
   pid=$(lsof -t -i tcp:$p) && kill -9 $pid || true
 done
-pkill -f "mock-consent-api.js" >/dev/null 2>&1 || true
+pkill -f "orchestration-api.js" >/dev/null 2>&1 || true
 pkill -f "gatekeeper.js" >/dev/null 2>&1 || true
 pkill -f "dwp-service.js" >/dev/null 2>&1 || true
+pkill -f "hmrc-api.js" >/dev/null 2>&1 || true
+pkill -f "coach-api.js" >/dev/null 2>&1 || true
 pkill -f "vite.*5173" >/dev/null 2>&1 || true
 pkill -f "vite.*5174" >/dev/null 2>&1 || true
 
@@ -80,6 +82,9 @@ fi
 
 echo "▶ Creating topics..."
 podman exec kafka bash -lc '
+  for t in views.permitted.dwp.uc views.permitted.dwp.disability views.permitted.coach.basic hmrc.p45.summary employment.termination nhs.prescriptions consent.events; do
+    kafka-topics --bootstrap-server localhost:9092 --delete --topic $t >/dev/null 2>&1 || true
+  done
   for t in nhs.prescriptions consent.events employment.termination hmrc.p45.summary views.permitted.dwp.uc views.permitted.dwp.disability views.permitted.coach.basic; do
     kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic $t --partitions 1 --replication-factor 1
   done

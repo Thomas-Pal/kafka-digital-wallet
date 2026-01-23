@@ -13,7 +13,7 @@ echo "▶ Wait for Kafka health..."
 ./scripts/kafka-wait.sh 127.0.0.1:29092
 
 echo "▶ Create topics..."
-./scripts/kafka-create-topics.sh 127.0.0.1:29092
+RESET_TOPICS=1 ./scripts/kafka-create-topics.sh 127.0.0.1:29092
 
 echo "▶ Install Node deps (wallet, dwp, services)..."
 ( cd apps/wallet && rm -rf node_modules package-lock.json && npm i )
