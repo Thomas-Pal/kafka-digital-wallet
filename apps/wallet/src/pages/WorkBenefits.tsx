@@ -5,71 +5,165 @@ import {
   IonTitle,
   IonContent,
   IonCard,
-  IonCardHeader,
-  IonCardTitle,
   IonCardContent,
-  IonGrid,
-  IonRow,
-  IonCol,
-  IonChip,
+  IonList,
+  IonItem,
+  IonLabel,
+  IonButton,
+  IonModal,
+  IonText,
+  IonToast,
 } from '@ionic/react';
+import { useState } from 'react';
+import EvidenceCard from '../components/EvidenceCard';
+import { useCitizenStore } from '../state/useCitizenStore';
+import { grantConsent, requestConsent } from '../services/api';
 
 export default function WorkBenefits() {
+  const employment = useCitizenStore((state) => state.employment);
+  const citizen = useCitizenStore((state) => state.citizen);
+  const [showModal, setShowModal] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [toast, setToast] = useState({ open: false, message: '', color: 'success' as 'success' | 'danger' });
+
+  const handleGrant = async (ttlDays: number) => {
+    setSubmitting(true);
+    const response = await grantConsent({
+      citizenId: citizen.nhsId,
+      grantedTo: 'dwp',
+      scopes: ['employment.termination'],
+      ttlDays,
+      caseId: 'uc-9001',
+      purpose: 'DWP requests access to employment termination to prefill Universal Credit claim.',
+    });
+    setSubmitting(false);
+    setShowModal(false);
+    setToast({
+      open: true,
+      message: response.ok ? 'Consent granted for employment evidence.' : response.error || 'Unable to grant consent.',
+      color: response.ok ? 'success' : 'danger',
+    });
+  };
+
+  const handleRequestSupport = async () => {
+    const response = await requestConsent({
+      citizenId: citizen.nhsId,
+      grantedTo: 'dwp',
+      scopes: ['employment.termination'],
+      purpose: 'DWP requests access to Employment Termination to prefill Universal Credit claim.',
+      caseId: 'uc-9001',
+    });
+    setToast({
+      open: true,
+      message: response.ok ? 'Support request sent to DWP.' : response.error || 'Unable to request support.',
+      color: response.ok ? 'success' : 'danger',
+    });
+  };
+
   return (
     <IonPage>
       <IonHeader>
-        <IonToolbar color="primary">
+        <IonToolbar className="header-gov">
           <IonTitle>Work & Benefits</IonTitle>
         </IonToolbar>
       </IonHeader>
-      <IonContent>
-        <IonCard>
-          <IonCardHeader>
-            <IonCardTitle>Employment Status</IonCardTitle>
-          </IonCardHeader>
+      <IonContent className="ion-padding">
+        <EvidenceCard title="Employment status" subtitle="Your current employer and work profile.">
+          <IonList>
+            <IonItem>
+              <IonLabel>
+                <h4>{employment.employerName}</h4>
+                <p>{employment.status}</p>
+              </IonLabel>
+            </IonItem>
+            <IonItem>
+              <IonLabel>
+                <h4>Salary & hours</h4>
+                <p>£{employment.annualSalary.toLocaleString()} · {employment.weeklyHours} hrs</p>
+              </IonLabel>
+            </IonItem>
+          </IonList>
+        </EvidenceCard>
+
+        <IonCard className="gov-card">
           <IonCardContent>
-            <IonGrid>
-              <IonRow>
-                <IonCol size="12" sizeMd="6">
-                  <h3 style={{ marginTop: 0 }}>Last employment</h3>
-                  <p style={{ margin: '6px 0' }}>
-                    Employer: Acme Widgets Ltd · Role: Warehouse Operative
-                  </p>
-                  <p style={{ margin: '6px 0', color: '#666' }}>
-                    Termination: 22 Jan 2026 · Reason: Redundancy
-                  </p>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <IonChip color="warning">UC assessment pending</IonChip>
-                    <IonChip color="tertiary">Coach support eligible</IonChip>
-                  </div>
-                </IonCol>
-                <IonCol size="12" sizeMd="6">
-                  <h4 style={{ marginTop: 0 }}>Financial context</h4>
-                  <p style={{ margin: '6px 0' }}>Annual salary: £38,000 · Weekly hours: 37.5</p>
-                  <p style={{ margin: '6px 0', color: '#666' }}>
-                    Evidence bundle ready for Universal Credit case uc-9001.
-                  </p>
-                </IonCol>
-              </IonRow>
-            </IonGrid>
+            <h3>Termination history</h3>
+            <IonList>
+              {employment.terminationHistory.map((entry) => (
+                <IonItem key={`${entry.date}-${entry.reason}`}>
+                  <IonLabel>
+                    <h4>{entry.reason}</h4>
+                    <p>{entry.date}</p>
+                  </IonLabel>
+                </IonItem>
+              ))}
+            </IonList>
           </IonCardContent>
         </IonCard>
 
-        <IonCard>
-          <IonCardHeader>
-            <IonCardTitle>What happens next</IonCardTitle>
-          </IonCardHeader>
+        <IonCard className="gov-card">
           <IonCardContent>
-            <p style={{ marginTop: 0 }}>
-              When an employment change is recorded, you will receive a consent request from DWP
-              or a Work Coach. Approving that request shares only the evidence needed for UC.
-            </p>
-            <p style={{ marginTop: 12, color: '#666' }}>
-              Use <strong>Scenarios</strong> to simulate a termination event, then approve the
-              consent request in <strong>Requests</strong>.
-            </p>
+            <h3>Request support</h3>
+            <p>Ask DWP to begin a Universal Credit support review.</p>
+            <IonButton expand="block" fill="outline" onClick={handleRequestSupport}>
+              Request support
+            </IonButton>
           </IonCardContent>
         </IonCard>
+
+        <IonCard className="gov-card">
+          <IonCardContent>
+            <h3>Share employment info with DWP</h3>
+            <p>Share termination evidence for Universal Credit (UC).</p>
+            <IonButton expand="block" className="gov-button" onClick={() => setShowModal(true)}>
+              Share employment info
+            </IonButton>
+            <IonButton expand="block" fill="clear" routerLink="/scenario-lab">
+              Trigger employment termination (demo)
+            </IonButton>
+          </IonCardContent>
+        </IonCard>
+
+        <IonModal isOpen={showModal} onDidDismiss={() => setShowModal(false)}>
+          <IonHeader>
+            <IonToolbar className="header-gov">
+              <IonTitle>Share data with DWP</IonTitle>
+            </IonToolbar>
+          </IonHeader>
+          <IonContent className="ion-padding">
+            <IonText>
+              <p>
+                DWP needs read-only access to the items below to help prefill your claim. You can revoke at any time.
+              </p>
+            </IonText>
+            <ul>
+              <li>Employment termination</li>
+            </ul>
+            <IonText color="medium">
+              <p>What happens next: DWP receives a permitted view only after consent is granted.</p>
+            </IonText>
+            <IonButton expand="block" disabled={submitting} onClick={() => handleGrant(90)}>
+              Allow 3 months
+            </IonButton>
+            <IonButton expand="block" fill="outline" disabled={submitting} onClick={() => handleGrant(30)}>
+              Allow 1 month
+            </IonButton>
+            <IonButton expand="block" fill="outline" disabled={submitting} onClick={() => handleGrant(7)}>
+              Allow 1 week
+            </IonButton>
+            <IonButton expand="block" color="medium" fill="clear" onClick={() => setShowModal(false)}>
+              Cancel
+            </IonButton>
+          </IonContent>
+        </IonModal>
+
+        <IonToast
+          isOpen={toast.open}
+          message={toast.message}
+          color={toast.color}
+          duration={2200}
+          onDidDismiss={() => setToast((prev) => ({ ...prev, open: false }))}
+        />
       </IonContent>
     </IonPage>
   );

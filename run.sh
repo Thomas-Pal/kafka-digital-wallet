@@ -25,9 +25,7 @@ echo "▶ Start backend services (bg)..."
 lsof -ti:4000,5001,5002 | xargs -r kill -9 || true
 ( cd services && RUN_ID=$RANDOM nohup npm run orchestration-api > ../logs/orchestration-api.log 2>&1 & )
 ( cd services && RUN_ID=$RANDOM nohup npm run gatekeeper  > ../logs/gatekeeper.log  2>&1 & )
-( cd services && RUN_ID=$RANDOM nohup npm run dwp        > ../logs/dwp-api.log    2>&1 & )
-( cd services && RUN_ID=$RANDOM nohup npm run hmrc-api     > ../logs/hmrc-api.log     2>&1 & )
-( cd services && RUN_ID=$RANDOM nohup npm run coach-api    > ../logs/coach-api.log    2>&1 & )
+( cd services && RUN_ID=$RANDOM nohup npm run dwp-api      > ../logs/dwp-api.log    2>&1 & )
 
 echo "▶ Start UIs (wallet 5173, dwp 5174)..."
 lsof -ti:5173,5174 | xargs -r kill -9 || true
@@ -40,4 +38,4 @@ echo "  Wallet:     http://localhost:5173"
 echo "  DWP Portal: http://localhost:5174"
 echo "  Kafka UI:   http://localhost:8080"
 echo
-echo "✅ Use the Wallet 'Scenarios' tab to drive the demo (no terminal steps)."
+echo "✅ Use the Wallet Scenario Lab tab to drive the demo (no terminal steps)."

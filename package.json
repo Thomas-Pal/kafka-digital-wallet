@@ -2,7 +2,8 @@
   "name": "kafka-digital-wallet",
   "private": true,
   "scripts": {
-    "wallet": "npm --prefix apps/wallet run dev",
-    "dwp-ui": "npm --prefix dwp-portal run dev"
+    "start:services": "cd services && (npm run orchestration-api & npm run gatekeeper & npm run dwp-api)",
+    "wallet": "npm --prefix apps/wallet run dev -- --port 5173",
+    "dwp": "npm --prefix dwp-portal run dev -- --port 5174"
   }
 }

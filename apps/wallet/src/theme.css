@@ -3,30 +3,54 @@
   --govuk-yellow: #ffbf47;
   --govuk-green: #00703c;
   --govuk-red: #d4351c;
+  --govuk-grey: #f3f4f6;
+  --govuk-text: #0b0c0c;
 }
+
+body {
+  color: var(--govuk-text);
+}
+
 .header-gov {
   background: var(--govuk-blue);
   color: white;
 }
-.badge {
-  display: inline-block;
-  font-size: 12px;
-  padding: 2px 8px;
-  border-radius: 999px;
+
+.gov-card {
+  border-radius: 16px;
+  box-shadow: 0 12px 24px rgba(15, 23, 42, 0.08);
 }
-.badge-green {
-  background: #e6f4ea;
-  color: var(--govuk-green);
+
+.stat-pill {
+  border-radius: 14px;
+  background: white;
 }
-.badge-amber {
-  background: #fff3cd;
-  color: #924f00;
+
+.stat-pill.primary {
+  border-left: 6px solid var(--govuk-blue);
 }
-.badge-red {
-  background: #fbeaea;
-  color: var(--govuk-red);
+
+.stat-pill.success {
+  border-left: 6px solid var(--govuk-green);
 }
-.card-note {
-  font-size: 12px;
-  color: #555;
+
+.stat-pill.warning {
+  border-left: 6px solid var(--govuk-yellow);
+}
+
+.stat-pill.tertiary {
+  border-left: 6px solid #6b7280;
+}
+
+.stat-callout {
+  background: var(--govuk-grey);
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 14px;
+}
+
+.gov-button {
+  --background: var(--govuk-blue);
+  --border-radius: 10px;
+  font-weight: 600;
 }
