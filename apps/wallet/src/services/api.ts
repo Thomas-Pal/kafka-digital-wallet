@@ -1,46 +1,95 @@
-import type { ConsentRequest, ConsentGrant, Scope, RelyingParty } from '../types';
+const API_BASE = 'http://localhost:4000';
 
-const ORCH_API = import.meta.env.VITE_ORCH_API || import.meta.env.VITE_CONSENT_API || 'http://localhost:4000';
-const DWP_API = import.meta.env.VITE_DWP_API || 'http://localhost:5001';
+type ApiResponse<T> = { ok: boolean; data?: T; error?: string };
 
-export async function listRequests(): Promise<ConsentRequest[]> {
-  const r = await fetch(`${ORCH_API}/api/requests`);
-  return r.json();
+const jsonHeaders = {
+  'Content-Type': 'application/json'
+};
+
+const makeId = () => {
+  if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+    return crypto.randomUUID();
+  }
+  return `evt-${Date.now()}-${Math.random().toString(16).slice(2)}`;
+};
+
+async function request<T>(path: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
+  try {
+    const res = await fetch(`${API_BASE}${path}`, options);
+    const data = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      return { ok: false, error: data?.error || 'Request failed' };
+    }
+    return { ok: true, data };
+  } catch (error) {
+    return { ok: false, error: error instanceof Error ? error.message : 'Network error' };
+  }
 }
 
-export async function approveRequest(
-  requestId: string,
-  ttlMinutes = 180
-): Promise<ConsentGrant> {
-  const r = await fetch(`${ORCH_API}/api/approve`, {
+export function fetchPendingConsents() {
+  return request('/consent/pending');
+}
+
+export function fetchActiveConsents() {
+  return request('/consent/active');
+}
+
+export function fetchAudit() {
+  return request('/consent/audit');
+}
+
+export function requestConsent(payload: Record<string, unknown>) {
+  const eventId = makeId();
+  return request('/consent/request', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ requestId, ttlMinutes }),
+    headers: { ...jsonHeaders, 'Idempotency-Key': eventId },
+    body: JSON.stringify({ eventId, ...payload })
   });
-  return r.json();
 }
 
-export async function issueAdHocGrant(params: {
-  rp: RelyingParty;
-  citizenId: string;
-  caseId?: string;
-  scopes: Scope[];
-  ttlMinutes?: number;
-}): Promise<ConsentGrant> {
-  const r = await fetch(`${ORCH_API}/api/grant`, {
+export function grantConsent(payload: Record<string, unknown>) {
+  const eventId = makeId();
+  return request('/consent/grant', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ ttlMinutes: 180, ...params }),
+    headers: { ...jsonHeaders, 'Idempotency-Key': eventId },
+    body: JSON.stringify({ eventId, ...payload })
   });
-  return r.json();
 }
 
-export async function listConsents(): Promise<ConsentGrant[]> {
-  const r = await fetch(`${ORCH_API}/api/consents`);
-  return r.json();
+export function denyConsent(payload: Record<string, unknown>) {
+  const eventId = makeId();
+  return request('/consent/deny', {
+    method: 'POST',
+    headers: { ...jsonHeaders, 'Idempotency-Key': eventId },
+    body: JSON.stringify({ eventId, ...payload })
+  });
 }
 
-export async function getDwpCaseView(caseId: string) {
-  const r = await fetch(`${DWP_API}/api/case/${encodeURIComponent(caseId)}/view`);
-  return r.json();
+export function revokeConsent(payload: Record<string, unknown>) {
+  const eventId = makeId();
+  return request('/consent/revoke', {
+    method: 'POST',
+    headers: { ...jsonHeaders, 'Idempotency-Key': eventId },
+    body: JSON.stringify({ eventId, ...payload })
+  });
 }
+
+export function triggerEmploymentTermination(payload: Record<string, unknown>) {
+  const eventId = makeId();
+  return request('/triggers/employment-termination', {
+    method: 'POST',
+    headers: { ...jsonHeaders, 'Idempotency-Key': eventId },
+    body: JSON.stringify({ eventId, ...payload })
+  });
+}
+
+export function triggerPrescription(payload: Record<string, unknown>) {
+  const eventId = makeId();
+  return request('/triggers/nhs-prescription', {
+    method: 'POST',
+    headers: { ...jsonHeaders, 'Idempotency-Key': eventId },
+    body: JSON.stringify({ eventId, ...payload })
+  });
+}
+
+export { makeId };

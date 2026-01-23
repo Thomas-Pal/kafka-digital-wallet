@@ -1,16 +1,3 @@
-export const PrescriptionEvent = (overrides = {}) => ({
-  eventId: overrides.eventId || `evt-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-  citizenId: 'nhs-999',
-  drug: 'Sumatriptan',
-  dosage: '50mg',
-  frequency: 'PRN',
-  repeat: true,
-  gpOdsCode: 'A12345',
-  condition: 'Chronic migraine',
-  prescribedAt: new Date().toISOString(),
-  ...overrides,
-});
-
 export const TerminationEvent = (overrides = {}) => ({
   eventId: overrides.eventId || `evt-${Date.now()}-${Math.random().toString(16).slice(2)}`,
   citizenId: 'nhs-999',
@@ -26,14 +13,15 @@ export const TerminationEvent = (overrides = {}) => ({
   ...overrides,
 });
 
-export const ConsentEvent = (overrides = {}) => ({
+export const PrescriptionEvent = (overrides = {}) => ({
   eventId: overrides.eventId || `evt-${Date.now()}-${Math.random().toString(16).slice(2)}`,
-  type: 'grant',
   citizenId: 'nhs-999',
-  grantedTo: 'dwp',
-  scopes: ['nhs.prescriptions', 'employment.termination'],
-  caseId: 'uc-9001',
-  ttlDays: 90,
-  issuedAt: new Date().toISOString(),
+  drug: 'Sumatriptan',
+  dosage: '50mg',
+  frequency: 'PRN',
+  repeat: true,
+  gpOdsCode: 'A12345',
+  condition: 'Chronic migraine',
+  prescribedAt: new Date().toISOString(),
   ...overrides,
 });
