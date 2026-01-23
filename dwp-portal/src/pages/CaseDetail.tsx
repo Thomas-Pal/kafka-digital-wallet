@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import EvidenceList from '../components/EvidenceList';
 import Timeline from '../components/Timeline';
+import { DWP_API_BASE } from '../config';
 
 type CaseDetail = {
   caseId: string;
@@ -20,7 +21,7 @@ export default function CaseDetail({ caseId, onBack }: { caseId: string; onBack:
   useEffect(() => {
     let active = true;
     const load = async () => {
-      const response = await fetch(`http://localhost:5001/api/case/${encodeURIComponent(caseId)}`)
+      const response = await fetch(`${DWP_API_BASE}/api/case/${encodeURIComponent(caseId)}`)
         .then((r) => r.json())
         .catch(() => null);
       if (active) setDetail(response);

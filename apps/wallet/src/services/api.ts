@@ -1,9 +1,9 @@
-const API_BASE = 'http://localhost:4000';
+const API_BASE = import.meta.env.VITE_ORCHESTRATION_API || 'http://localhost:4000';
 
 type ApiResponse<T> = { ok: boolean; data?: T; error?: string };
 
 const jsonHeaders = {
-  'Content-Type': 'application/json'
+  'Content-Type': 'application/json',
 };
 
 const makeId = () => {
@@ -26,6 +26,15 @@ async function request<T>(path: string, options: RequestInit = {}): Promise<ApiR
   }
 }
 
+function postWithIdempotency(path: string, payload: Record<string, unknown>) {
+  const eventId = makeId();
+  return request(path, {
+    method: 'POST',
+    headers: { ...jsonHeaders, 'Idempotency-Key': eventId },
+    body: JSON.stringify({ eventId, ...payload }),
+  });
+}
+
 export function fetchPendingConsents() {
   return request('/consent/pending');
 }
@@ -39,57 +48,25 @@ export function fetchAudit() {
 }
 
 export function requestConsent(payload: Record<string, unknown>) {
-  const eventId = makeId();
-  return request('/consent/request', {
-    method: 'POST',
-    headers: { ...jsonHeaders, 'Idempotency-Key': eventId },
-    body: JSON.stringify({ eventId, ...payload })
-  });
+  return postWithIdempotency('/consent/request', payload);
 }
 
 export function grantConsent(payload: Record<string, unknown>) {
-  const eventId = makeId();
-  return request('/consent/grant', {
-    method: 'POST',
-    headers: { ...jsonHeaders, 'Idempotency-Key': eventId },
-    body: JSON.stringify({ eventId, ...payload })
-  });
+  return postWithIdempotency('/consent/grant', payload);
 }
 
 export function denyConsent(payload: Record<string, unknown>) {
-  const eventId = makeId();
-  return request('/consent/deny', {
-    method: 'POST',
-    headers: { ...jsonHeaders, 'Idempotency-Key': eventId },
-    body: JSON.stringify({ eventId, ...payload })
-  });
+  return postWithIdempotency('/consent/deny', payload);
 }
 
 export function revokeConsent(payload: Record<string, unknown>) {
-  const eventId = makeId();
-  return request('/consent/revoke', {
-    method: 'POST',
-    headers: { ...jsonHeaders, 'Idempotency-Key': eventId },
-    body: JSON.stringify({ eventId, ...payload })
-  });
+  return postWithIdempotency('/consent/revoke', payload);
 }
 
 export function triggerEmploymentTermination(payload: Record<string, unknown>) {
-  const eventId = makeId();
-  return request('/triggers/employment-termination', {
-    method: 'POST',
-    headers: { ...jsonHeaders, 'Idempotency-Key': eventId },
-    body: JSON.stringify({ eventId, ...payload })
-  });
+  return postWithIdempotency('/triggers/employment-termination', payload);
 }
 
 export function triggerPrescription(payload: Record<string, unknown>) {
-  const eventId = makeId();
-  return request('/triggers/nhs-prescription', {
-    method: 'POST',
-    headers: { ...jsonHeaders, 'Idempotency-Key': eventId },
-    body: JSON.stringify({ eventId, ...payload })
-  });
+  return postWithIdempotency('/triggers/nhs-prescription', payload);
 }
-
-export { makeId };

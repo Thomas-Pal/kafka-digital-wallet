@@ -22,12 +22,12 @@ Start services:
 npm run start:services
 ```
 
-Start the Wallet:
+Start the Wallet (override API base with `VITE_ORCHESTRATION_API` if needed):
 ```bash
 npm run wallet
 ```
 
-Start the DWP portal:
+Start the DWP portal (override API base with `VITE_DWP_API` if needed):
 ```bash
 npm run dwp
 ```

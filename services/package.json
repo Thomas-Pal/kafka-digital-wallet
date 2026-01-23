@@ -13,8 +13,6 @@
   "scripts": {
     "orchestration-api": "node orchestration-api/index.js",
     "gatekeeper": "node gatekeeper/index.js",
-    "dwp-api": "node dwp-api/index.js",
-    "demo-sim": "node demo-sim.js",
-    "produce:nhs": "node mock-nhs-producer.js"
+    "dwp-api": "node dwp-api/index.js"
   }
 }

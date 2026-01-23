@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import CaseRow from '../components/CaseRow';
+import { DWP_API_BASE } from '../config';
 
 type CaseSummary = {
   caseId: string;
@@ -25,8 +26,8 @@ export default function CasesList({ onOpen }: { onOpen: (id: string) => void }) 
     let active = true;
     const load = async () => {
       const [casesRes, statsRes] = await Promise.all([
-        fetch('http://localhost:5001/api/cases').then((r) => r.json()).catch(() => []),
-        fetch('http://localhost:5001/api/stats').then((r) => r.json()).catch(() => ({ total: 0, ready: 0, awaiting: 0 })),
+        fetch(`${DWP_API_BASE}/api/cases`).then((r) => r.json()).catch(() => []),
+        fetch(`${DWP_API_BASE}/api/stats`).then((r) => r.json()).catch(() => ({ total: 0, ready: 0, awaiting: 0 })),
       ]);
       if (!active) return;
       setCases(Array.isArray(casesRes) ? casesRes : []);
