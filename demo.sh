@@ -30,9 +30,11 @@ echo "▶ Killing stale processes on ports (4000,5001,5002,5173,5174)..."
 for p in 4000 5001 5002 5173 5174; do
   pid=$(lsof -t -i tcp:$p) && kill -9 $pid || true
 done
-pkill -f "mock-consent-api.js" >/dev/null 2>&1 || true
+pkill -f "orchestration-api.js" >/dev/null 2>&1 || true
 pkill -f "gatekeeper.js" >/dev/null 2>&1 || true
 pkill -f "dwp-service.js" >/dev/null 2>&1 || true
+pkill -f "hmrc-api.js" >/dev/null 2>&1 || true
+pkill -f "coach-api.js" >/dev/null 2>&1 || true
 pkill -f "vite.*5173" >/dev/null 2>&1 || true
 pkill -f "vite.*5174" >/dev/null 2>&1 || true
 
@@ -80,7 +82,10 @@ fi
 
 echo "▶ Creating topics..."
 podman exec kafka bash -lc '
-  for t in nhs.raw.prescriptions consent.events employment.termination hmrc.p45.summary; do
+  for t in views.permitted.dwp.uc views.permitted.dwp.disability views.permitted.coach.basic hmrc.p45.summary employment.termination nhs.prescriptions consent.events; do
+    kafka-topics --bootstrap-server localhost:9092 --delete --topic $t >/dev/null 2>&1 || true
+  done
+  for t in nhs.prescriptions consent.events employment.termination hmrc.p45.summary views.permitted.dwp.uc views.permitted.dwp.disability views.permitted.coach.basic; do
     kafka-topics --bootstrap-server localhost:9092 --create --if-not-exists --topic $t --partitions 1 --replication-factor 1
   done
   kafka-topics --bootstrap-server localhost:9092 --list
@@ -92,9 +97,11 @@ echo "▶ Installing dependencies..."
 ( cd "$ROOT_DIR/dwp-portal" && npm i >/dev/null )
 
 echo "▶ Starting backend services (background)..."
-start_service consent-api npm run consent-api
-start_service gatekeeper  npm run gatekeeper
-start_service dwp        npm run dwp
+start_service orchestration-api npm run orchestration-api
+start_service gatekeeper        npm run gatekeeper
+start_service dwp               npm run dwp
+start_service hmrc-api          npm run hmrc-api
+start_service coach-api         npm run coach-api
 
 echo "▶ Starting UIs (Wallet 5173, DWP 5174) ..."
 ( cd "$ROOT_DIR/apps/wallet" && nohup npm run dev -- --port 5173 >"$LOG_DIR/wallet.log" 2>&1 & )
@@ -108,38 +115,11 @@ echo "  - DWP Portal: http://localhost:5174"
 echo "  - Kafka UI:   http://localhost:8080"
 
 echo
-echo "Press ENTER to send a DWP consent REQUEST (case 9001 / citizen nhs-999)..."
-read -r
-curl -s -X POST http://localhost:4000/consent/request \
-  -H 'content-type: application/json' \
-  -d '{"rp":"dwp","caseId":"9001","citizenId":"nhs-999","scopes":["nhs.prescriptions"]}' | jq .
-
-echo
-echo "🔔 Approve in the Wallet UI, then press ENTER..."
-read -r
-
-echo "▶ Verifying GRANT exists..."
-GRANT_FOUND=$(podman exec kafka kafka-console-consumer --bootstrap-server 127.0.0.1:29092 \
-  --topic consent.events --from-beginning --timeout-ms 1500 2>/dev/null | grep -c '"eventType":"grant"' || true)
-
-if [ "$GRANT_FOUND" -eq 0 ]; then
-  echo "❌ No grant found. Forcing a grant now..."
-  curl -s -X POST http://localhost:4000/consent/grant \
-    -H 'content-type: application/json' \
-    -d '{"rp":"dwp","caseId":"9001","citizenId":"nhs-999","scopes":["nhs.prescriptions"],"ttlDays":90}' >/dev/null
-  sleep 1
-fi
-
-echo "▶ Publishing RAW now (post-consent)..."
-( cd "$ROOT_DIR/services" && npm run produce:nhs )
-
-echo
-echo "🔎 DWP case view (9001):"
-curl -s http://localhost:5001/api/case/9001/view | jq .
+echo "✅ Demo is ready. Use Wallet → Scenarios to request consent and trigger mock events."
 
 echo
 echo "📺 Open (copy/paste):"
 echo "  Wallet: http://localhost:5173"
 echo "  DWP:    http://localhost:5174"
 echo "  Kafka:  http://localhost:8080"
-echo "Logs: tail -n +1 $LOG_DIR/consent-api.log $LOG_DIR/gatekeeper.log $LOG_DIR/dwp.log"
+echo "Logs: tail -n +1 $LOG_DIR/orchestration-api.log $LOG_DIR/gatekeeper.log $LOG_DIR/dwp.log $LOG_DIR/hmrc-api.log $LOG_DIR/coach-api.log"

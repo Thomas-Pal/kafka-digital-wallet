@@ -22,6 +22,7 @@ import HMRC from './pages/HMRC';
 import Requests from './pages/Requests';
 import Consents from './pages/Consents';
 import Activity from './pages/Activity';
+import Scenarios from './pages/Scenarios';
 
 export default function App() {
   return (
@@ -37,6 +38,7 @@ export default function App() {
               <Route path="/requests" element={<Requests />} />
               <Route path="/consents" element={<Consents />} />
               <Route path="/activity" element={<Activity />} />
+              <Route path="/scenarios" element={<Scenarios />} />
             </Routes>
           </IonRouterOutlet>
           <IonTabBar slot="bottom">
@@ -55,6 +57,10 @@ export default function App() {
             <IonTabButton tab="requests" href="/requests">
               <IonIcon icon={mailUnread} />
               <IonLabel>Requests</IonLabel>
+            </IonTabButton>
+            <IonTabButton tab="scenarios" href="/scenarios">
+              <IonIcon icon={mailUnread} />
+              <IonLabel>Scenarios</IonLabel>
             </IonTabButton>
             <IonTabButton tab="consents" href="/consents">
               <IonIcon icon={shieldCheckmark} />

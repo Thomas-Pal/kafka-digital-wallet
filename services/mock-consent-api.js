@@ -47,13 +47,21 @@ function scheduleRevoke(consentId, expiresAtMs) {
   setTimeout(() => revokeConsent(consentId), delay || 0);
 }
 
-app.post('/consent/request', async (req, res) => {
-  const { rp='dwp', caseId, citizenId, scopes=['nhs.prescriptions'] } = req.body;
-  if (!caseId || !citizenId) return res.status(400).json({ ok:false, error:'caseId and citizenId required' });
-  const evt = { eventType:'request', consentId:uuid(), rp, caseId, citizenId, scopes, issuedAt:new Date().toISOString() };
-  await producer.send({ topic: CONSENT_TOPIC, messages:[{ key: citizenId, value:JSON.stringify(evt) }] });
+async function createRequest(body, res) {
+  const { rp = 'dwp', caseId, citizenId, scopes = ['nhs.prescriptions'] } = body;
+  if (!caseId || !citizenId) return res.status(400).json({ ok: false, error: 'caseId and citizenId required' });
+  const evt = { eventType: 'request', consentId: uuid(), rp, caseId, citizenId, scopes, issuedAt: new Date().toISOString() };
+  await producer.send({ topic: CONSENT_TOPIC, messages: [{ key: citizenId, value: JSON.stringify(evt) }] });
   addPending(citizenId, { id: evt.consentId, rp, caseId, citizenId, scopes, issuedAt: evt.issuedAt });
-  res.json({ ok:true, evt });
+  return res.json({ ok: true, evt });
+}
+
+app.post('/consent/request', async (req, res) => {
+  await createRequest(req.body, res);
+});
+
+app.post('/api/request', async (req, res) => {
+  await createRequest(req.body, res);
 });
 
 app.get('/consent/pending', (req, res) => {
