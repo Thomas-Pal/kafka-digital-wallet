@@ -37,12 +37,31 @@ function useCaseView(caseId: string) {
 
 function CaseDetail({ caseId }: { caseId: string }) {
   const rows = useCaseView(caseId);
+  const context =
+    caseId.startsWith('uc-')
+      ? {
+          title: 'Universal Credit Assessment',
+          summary:
+            'Employment termination evidence and HMRC tax summaries support eligibility and payment decisions.'
+        }
+      : caseId.startsWith('dis-')
+        ? {
+            title: 'Disability Benefit Review',
+            summary:
+              'Prescription history indicates functional impact and supports disability entitlement.'
+          }
+        : {
+            title: 'Case Review',
+            summary: 'Consent-filtered evidence shared by the citizen.'
+          };
 
   return (
     <div style={{ maxWidth: 1100, margin: '28px auto', fontFamily: 'system-ui', padding: 16 }}>
       <a href="/">← Back to cases</a>
       <h1 style={{ marginTop: 12 }}>Case {caseId}</h1>
-      <p style={{ color: '#555' }}>Decoded view messages for this case.</p>
+      <p style={{ color: '#555' }}>
+        {context.title} · {context.summary}
+      </p>
 
       <div style={{ display: 'grid', gap: 16 }}>
         {rows.map((row, i) => {
