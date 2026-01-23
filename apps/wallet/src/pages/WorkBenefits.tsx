@@ -12,9 +12,7 @@ import {
   IonRow,
   IonCol,
   IonChip,
-  IonButton,
 } from '@ionic/react';
-import { issueAdHocGrant } from '../services/api';
 
 export default function WorkBenefits() {
   return (
@@ -59,43 +57,16 @@ export default function WorkBenefits() {
 
         <IonCard>
           <IonCardHeader>
-            <IonCardTitle>Share with DWP & Coach</IonCardTitle>
+            <IonCardTitle>What happens next</IonCardTitle>
           </IonCardHeader>
           <IonCardContent>
             <p style={{ marginTop: 0 }}>
-              Grant time-limited access to termination evidence so DWP can assess UC eligibility
-              and a Work Coach can schedule support.
+              When an employment change is recorded, you will receive a consent request from DWP
+              or a Work Coach. Approving that request shares only the evidence needed for UC.
             </p>
-            <div style={{ display: 'flex', gap: 8, marginTop: 12, flexWrap: 'wrap' }}>
-              <IonButton
-                onClick={() =>
-                  issueAdHocGrant({
-                    rp: 'dwp',
-                    citizenId: 'cit-123',
-                    caseId: 'uc-9001',
-                    scopes: ['share:dwp:uc'],
-                    ttlMinutes: 180,
-                  })
-                }
-              >
-                Grant DWP UC Access
-              </IonButton>
-              <IonButton
-                fill="outline"
-                onClick={() =>
-                  issueAdHocGrant({
-                    rp: 'coach',
-                    citizenId: 'cit-123',
-                    scopes: ['share:coach:basic'],
-                    ttlMinutes: 180,
-                  })
-                }
-              >
-                Grant Coach Support Access
-              </IonButton>
-            </div>
             <p style={{ marginTop: 12, color: '#666' }}>
-              Access is scoped to UC eligibility evidence and expires automatically.
+              Use <strong>Scenarios</strong> to simulate a termination event, then approve the
+              consent request in <strong>Requests</strong>.
             </p>
           </IonCardContent>
         </IonCard>

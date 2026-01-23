@@ -41,6 +41,13 @@ export default function Activity() {
         <IonList>
           <IonItem lines="full">
             <IonLabel>
+              <h2>Scenario simulated: NHS prescription update</h2>
+              <p>Awaiting consent approval for disability sharing</p>
+            </IonLabel>
+            <IonBadge color="warning">Pending</IonBadge>
+          </IonItem>
+          <IonItem lines="full">
+            <IonLabel>
               <h2>Consent granted: DWP UC case uc-9001</h2>
               <p>Share scope: share:dwp:uc · 22 Jan 2026, 17:18</p>
             </IonLabel>

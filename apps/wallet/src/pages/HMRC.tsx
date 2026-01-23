@@ -45,7 +45,7 @@ export default function HMRC() {
                   <h4 style={{ marginTop: 0 }}>Employer summary</h4>
                   <p style={{ margin: '6px 0' }}>Acme Widgets Ltd · Leaving date: 22 Jan 2026</p>
                   <p style={{ margin: '6px 0', color: '#666' }}>
-                    This data can be used to validate Universal Credit eligibility.
+                    This data is linked to your benefits case only after you approve a consent request.
                   </p>
                 </IonCol>
               </IonRow>
@@ -60,6 +60,9 @@ export default function HMRC() {
             <p style={{ marginTop: 0 }}>
               Verified HMRC summaries reduce manual evidence requests and speed up benefit
               decisions by sharing tax and employment data directly from source.
+            </p>
+            <p style={{ marginTop: 12, color: '#666' }}>
+              You stay in control: sharing only begins after a consent request is approved.
             </p>
           </IonCardContent>
         </IonCard>

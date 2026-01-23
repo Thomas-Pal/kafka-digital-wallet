@@ -12,10 +12,7 @@ import {
   IonGrid,
   IonRow,
   IonCol,
-  IonButton,
 } from '@ionic/react';
-import { issueAdHocGrant } from '../services/api';
-
 export default function Health() {
   return (
     <IonPage>
@@ -59,43 +56,16 @@ export default function Health() {
 
         <IonCard>
           <IonCardHeader>
-            <IonCardTitle>Share for Disability Support</IonCardTitle>
+            <IonCardTitle>What happens next</IonCardTitle>
           </IonCardHeader>
           <IonCardContent>
             <p style={{ marginTop: 0 }}>
-              Share a targeted medication history to support a disability benefits assessment.
+              When new prescriptions are issued, they appear here first. You control if and when
+              they can be shared to support disability benefits.
             </p>
-            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginTop: 12 }}>
-              <IonButton
-                onClick={() =>
-                  issueAdHocGrant({
-                    rp: 'dwp',
-                    citizenId: 'cit-123',
-                    caseId: 'dis-9002',
-                    scopes: ['share:dwp:disability'],
-                    ttlMinutes: 180,
-                  })
-                }
-              >
-                Grant DWP Disability Access
-              </IonButton>
-              <IonButton
-                fill="outline"
-                onClick={() =>
-                  issueAdHocGrant({
-                    rp: 'dwp',
-                    citizenId: 'cit-123',
-                    caseId: 'dis-9002',
-                    scopes: ['share:nhs:prescriptions'],
-                    ttlMinutes: 180,
-                  })
-                }
-              >
-                Share NHS Prescription Scope
-              </IonButton>
-            </div>
             <p style={{ marginTop: 12, color: '#666' }}>
-              This limits sharing to prescription data only and expires automatically after 180 minutes.
+              Use <strong>Scenarios</strong> to simulate a prescription update, then approve the
+              consent request in <strong>Requests</strong>.
             </p>
           </IonCardContent>
         </IonCard>
