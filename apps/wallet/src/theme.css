@@ -22,6 +22,11 @@ body {
   color: white;
 }
 
+.header-gov ion-title {
+  font-size: 20px;
+  font-weight: 700;
+}
+
 .gov-card {
   border-radius: 14px;
   border: 1px solid var(--govuk-border);
@@ -64,6 +69,11 @@ body {
   font-weight: 600;
 }
 
+.gov-button:focus-visible {
+  outline: 3px solid var(--govuk-focus);
+  outline-offset: 2px;
+}
+
 .gov-heading {
   font-weight: 700;
   letter-spacing: 0.2px;
@@ -72,6 +82,13 @@ body {
 .gov-subtitle {
   color: var(--govuk-dark-grey);
   font-size: 14px;
+}
+
+.gov-caption {
+  color: var(--govuk-dark-grey);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
 }
 
 .gov-badge {
@@ -100,6 +117,11 @@ body {
   font-weight: 600;
 }
 
+.gov-link:focus-visible {
+  outline: 3px solid var(--govuk-focus);
+  outline-offset: 2px;
+}
+
 .gov-section {
   display: grid;
   gap: 12px;
@@ -109,4 +131,10 @@ body {
   height: 1px;
   background: var(--govuk-border);
   margin: 12px 0;
+}
+
+ion-item::part(native) {
+  --padding-start: 12px;
+  --inner-padding-end: 12px;
+  border-radius: 8px;
 }
