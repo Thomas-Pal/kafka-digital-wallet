@@ -1,6 +1,5 @@
 #!/usr/bin/env bash
 # One-hit demo runner: brings up Kafka, creates topics, installs deps, starts services and dev servers.
-# It pauses for manual actions (wallet consent) and streams logs to ./logs/*.
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 LOG_DIR="$ROOT_DIR/logs"
@@ -80,25 +79,23 @@ echo "3) Install npm deps (services, apps/wallet, dwp-portal)"
 (cd dwp-portal && npm install)
 
 echo "4) Start backend services"
-run_bg consent-api "cd '$ROOT_DIR/services' && npm run consent-api"
+run_bg orchestration-api "cd '$ROOT_DIR/services' && npm run orchestration-api"
 run_bg gatekeeper "cd '$ROOT_DIR/services' && npm run gatekeeper"
-run_bg dwp-api "cd '$ROOT_DIR/services' && npm run dwp"
+run_bg dwp-api "cd '$ROOT_DIR/services' && npm run dwp-api"
 
 sleep 2
 echo "5) Start UIs (Vite dev servers)"
 run_bg wallet-ui "cd '$ROOT_DIR/apps/wallet' && npm run dev -- --host --port 5173"
 run_bg dwp-portal "cd '$ROOT_DIR/dwp-portal' && npm run dev -- --host --port 5174"
 
-echo "6) Seed RAW prescriptions"
-(cd services && npm run produce:nhs)
-
 cat <<'MSG'
 ---
 Next manual steps:
 - Open wallet UI:   http://localhost:5173
-  - Click "Allow" (grant) or "Revoke" for case #4711 / nhs-999.
+  - Approve consent requests in Consents.
+  - Use Scenario Lab to publish employment/prescription events.
 - Open DWP portal:  http://localhost:5174
-  - Send a consent request for a case, watch the indicator flip when approved.
+  - Cases populate only after consent + RAW evidence.
 Logs live under ./logs/*.log. Hit Ctrl+C to stop and tear down the background processes.
 MSG
 
