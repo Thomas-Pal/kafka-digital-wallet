@@ -5,10 +5,6 @@ RUN_ID="${RUN_ID:-$(date +%s)}"
 export RUN_ID
 
 ROOT_DIR=$(cd "$(dirname "$0")" && pwd)
-LOG_DIR="$ROOT_DIR/logs"
-mkdir -p "$LOG_DIR"
-# Clear old pids/logs so we don't read stale state
-rm -f "$LOG_DIR"/*.pid "$LOG_DIR"/*.log 2>/dev/null || true
 
 echo "▶ Preconditions (RUN_ID=$RUN_ID)"
 command -v podman >/dev/null || { echo "Podman is required"; exit 1; }
@@ -36,22 +32,18 @@ pkill -f "dwp-api" >/dev/null 2>&1 || true
 pkill -f "vite.*5173" >/dev/null 2>&1 || true
 pkill -f "vite.*5174" >/dev/null 2>&1 || true
 
-start_service() {
-  local name="$1"; shift
-  local logfile="$LOG_DIR/${name}.log"
-  local pidfile="$LOG_DIR/${name}.pid"
-  # stop any previous instance
-  if [[ -f "$pidfile" ]] && kill -0 "$(cat "$pidfile" 2>/dev/null)" 2>/dev/null; then
-    kill "$(cat "$pidfile")" 2>/dev/null || true
-    sleep 0.2
-  fi
-  ( cd "$ROOT_DIR/services" && nohup env RUN_ID="$RUN_ID" "$@" >"$logfile" 2>&1 & echo $! >"$pidfile" )
-  sleep 1
-  if [[ ! -f "$pidfile" ]] || ! kill -0 "$(cat "$pidfile" 2>/dev/null)" 2>/dev/null; then
-    echo "Service $name failed to start. See $logfile" >&2
-    tail -n 40 "$logfile" 2>/dev/null || true
-    exit 1
-  fi
+wait_health() {
+  local url="$1"
+  local name="$2"
+  for _ in {1..30}; do
+    if curl -sf "$url" >/dev/null; then
+      echo "✅ $name ready"
+      return
+    fi
+    sleep 1
+  done
+  echo "❌ $name failed health check" >&2
+  exit 1
 }
 
 echo "▶ Starting Kafka + UI (Podman compose)..."
@@ -95,13 +87,17 @@ echo "▶ Installing dependencies..."
 ( cd "$ROOT_DIR/dwp-portal" && npm i >/dev/null )
 
 echo "▶ Starting backend services (background)..."
-start_service orchestration-api npm run orchestration-api
-start_service gatekeeper        npm run gatekeeper
-start_service dwp-api           npm run dwp-api
+( cd "$ROOT_DIR/services" && env RUN_ID="$RUN_ID" npm run orchestration-api & )
+( cd "$ROOT_DIR/services" && env RUN_ID="$RUN_ID" npm run gatekeeper & )
+( cd "$ROOT_DIR/services" && env RUN_ID="$RUN_ID" npm run dwp-api & )
+
+wait_health "http://localhost:4000/healthz" "Orchestration API"
+wait_health "http://localhost:5002/healthz" "Gatekeeper"
+wait_health "http://localhost:5001/healthz" "DWP API"
 
 echo "▶ Starting UIs (Wallet 5173, DWP 5174) ..."
-( cd "$ROOT_DIR/apps/wallet" && nohup npm run dev -- --port 5173 >"$LOG_DIR/wallet.log" 2>&1 & )
-( cd "$ROOT_DIR/dwp-portal" && nohup npm run dev -- --port 5174  >"$LOG_DIR/portal.log" 2>&1 & )
+( cd "$ROOT_DIR/apps/wallet" && npm run dev -- --port 5173 & )
+( cd "$ROOT_DIR/dwp-portal" && npm run dev -- --port 5174 & )
 sleep 2
 
 echo
@@ -118,4 +114,3 @@ echo "📺 Open (copy/paste):"
 echo "  Wallet: http://localhost:5173"
 echo "  DWP:    http://localhost:5174"
 echo "  Kafka:  http://localhost:8080"
-echo "Logs: tail -n +1 $LOG_DIR/orchestration-api.log $LOG_DIR/gatekeeper.log $LOG_DIR/dwp-api.log"

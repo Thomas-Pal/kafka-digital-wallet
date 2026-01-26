@@ -7,8 +7,6 @@ podman machine start >/dev/null 2>&1 || true
 echo "▶ Compose up Kafka + UI..."
 podman compose up -d
 
-mkdir -p logs
-
 echo "▶ Wait for Kafka health..."
 ./scripts/kafka-wait.sh 127.0.0.1:29092
 
@@ -23,14 +21,14 @@ echo "▶ Install Node deps (wallet, dwp, services)..."
 echo "▶ Start backend services (bg)..."
 # Clean any prior pids on 4000/5001/5002
 lsof -ti:4000,5001,5002 | xargs -r kill -9 || true
-( cd services && RUN_ID=$RANDOM nohup npm run orchestration-api > ../logs/orchestration-api.log 2>&1 & )
-( cd services && RUN_ID=$RANDOM nohup npm run gatekeeper  > ../logs/gatekeeper.log  2>&1 & )
-( cd services && RUN_ID=$RANDOM nohup npm run dwp-api      > ../logs/dwp-api.log    2>&1 & )
+( cd services && RUN_ID=$RANDOM npm run orchestration-api & )
+( cd services && RUN_ID=$RANDOM npm run gatekeeper  & )
+( cd services && RUN_ID=$RANDOM npm run dwp-api      & )
 
 echo "▶ Start UIs (wallet 5173, dwp 5174)..."
 lsof -ti:5173,5174 | xargs -r kill -9 || true
-( cd apps/wallet && nohup npm run dev -- --port 5173 > ../../logs/wallet.log 2>&1 & )
-( cd dwp-portal && nohup npm run dev -- --port 5174 > ../logs/dwp-ui.log 2>&1 & ) || true
+( cd apps/wallet && npm run dev -- --port 5173 & )
+( cd dwp-portal && npm run dev -- --port 5174 & ) || true
 
 echo
 echo "📺 Open:"

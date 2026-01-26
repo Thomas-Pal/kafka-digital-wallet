@@ -27,6 +27,16 @@ body {
   font-weight: 700;
 }
 
+.gov-tabbar {
+  --background: var(--govuk-light-grey);
+  border-top: 1px solid var(--govuk-border);
+}
+
+.gov-tabbar ion-tab-button {
+  --color: var(--govuk-dark-grey);
+  --color-selected: var(--govuk-blue);
+}
+
 .gov-card {
   border-radius: 14px;
   border: 1px solid var(--govuk-border);

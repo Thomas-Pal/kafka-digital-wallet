@@ -11,8 +11,8 @@
     "uuid": "^9.0.1"
   },
   "scripts": {
-    "orchestration-api": "node orchestration-api/index.js",
-    "gatekeeper": "node gatekeeper/index.js",
-    "dwp-api": "node dwp-api/index.js"
+    "orchestration-api": "node apps/orchestration/index.js",
+    "gatekeeper": "node apps/gatekeeper/index.js",
+    "dwp-api": "node apps/dwp-api/index.js"
   }
 }

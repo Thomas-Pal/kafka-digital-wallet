@@ -1,7 +1,7 @@
 import express from 'express';
 import fetch from 'node-fetch';
-import { createKafka, waitForBroker } from '../lib/kafka.js';
-import { allowAll } from '../utils/cors.js';
+import { createKafka, waitForBroker } from '../../shared/lib/kafka.js';
+import { allowAll } from '../../shared/utils/cors.js';
 
 const app = express();
 app.use(express.json());

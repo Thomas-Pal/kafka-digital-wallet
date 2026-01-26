@@ -2,8 +2,6 @@
 # One-hit demo runner: brings up Kafka, creates topics, installs deps, starts services and dev servers.
 set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "$0")/.." && pwd)"
-LOG_DIR="$ROOT_DIR/logs"
-mkdir -p "$LOG_DIR"
 
 pids=()
 cleanup() {
@@ -19,8 +17,8 @@ trap cleanup EXIT
 run_bg() {
   local name="$1"
   local cmd="$2"
-  echo "Starting $name (logs -> $LOG_DIR/$name.log)"
-  bash -c "$cmd" >"$LOG_DIR/$name.log" 2>&1 &
+  echo "Starting $name"
+  bash -c "$cmd" &
   local pid=$!
   pids+=("$pid")
 }
@@ -96,7 +94,7 @@ Next manual steps:
   - Use Scenario Lab to publish employment/prescription events.
 - Open DWP portal:  http://localhost:5174
   - Cases populate only after consent + RAW evidence.
-Logs live under ./logs/*.log. Hit Ctrl+C to stop and tear down the background processes.
+Hit Ctrl+C to stop and tear down the background processes.
 MSG
 
 wait

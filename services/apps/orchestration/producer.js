@@ -1,5 +1,5 @@
-import { createKafka, waitForBroker } from '../lib/kafka.js';
-import { RUN_ID } from '../config.js';
+import { createKafka, waitForBroker } from '../../shared/lib/kafka.js';
+import { RUN_ID } from '../../shared/config.js';
 
 export async function createProducer(clientIdSuffix) {
   const kafka = createKafka(`orchestration-${clientIdSuffix}-${RUN_ID}`);

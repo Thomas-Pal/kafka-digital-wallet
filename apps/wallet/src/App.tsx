@@ -26,7 +26,7 @@ export default function App() {
           <IonRouterOutlet>
             <AppRoutes />
           </IonRouterOutlet>
-          <IonTabBar slot="bottom">
+          <IonTabBar slot="bottom" className="gov-tabbar">
             <IonTabButton tab="dashboard" href="/dashboard">
               <IonIcon icon={home} />
               <IonLabel>Dashboard</IonLabel>

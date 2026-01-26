@@ -1,5 +1,5 @@
 import express from 'express';
-import { allowAll } from '../utils/cors.js';
+import { allowAll } from '../../shared/utils/cors.js';
 import { createIdemCache } from './idemCache.js';
 import { createProducer } from './producer.js';
 import { createConsentRouter } from './routes/consent.js';

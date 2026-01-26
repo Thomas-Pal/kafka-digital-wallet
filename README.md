@@ -8,6 +8,14 @@ This demo shows a consent-driven UK Digital Wallet that controls data sharing wh
 - Gatekeeper emits VIEW topics only after consent + RAW match.
 - DWP portal starts empty and updates on permitted evidence only.
 
+## Repo layout
+- `apps/wallet` — Ionic React wallet UI.
+- `dwp-portal` — DWP caseworker portal UI.
+- `services/apps/orchestration` — REST API for consents + scenario triggers.
+- `services/apps/gatekeeper` — Kafka consumer/producer for consent-filtered views.
+- `services/apps/dwp-api` — DWP API fed from VIEW topics.
+- `services/shared` — shared Kafka config and CORS helpers.
+
 ## Screens (placeholders)
 - Wallet dashboard GIF: _(add screenshot/gif here)_
 - DWP portal GIF: _(add screenshot/gif here)_
@@ -56,6 +64,4 @@ chmod +x demo.sh
 ```bash
 podman logs kafka | grep -E '__consumer_offsets|GroupCoordinator|Coordinator' || true
 ```
-```bash
-tail -n +1 logs/orchestration-api.log logs/gatekeeper.log logs/dwp-api.log
-```
+Use `podman ps` and service consoles to verify the processes are running.

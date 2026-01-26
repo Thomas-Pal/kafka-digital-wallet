@@ -1,6 +1,5 @@
 import express from 'express';
-import { createKafka, waitForBroker } from '../lib/kafka.js';
-import { createDedupe } from './dedupe.js';
+import { createKafka, waitForBroker } from '../../shared/lib/kafka.js';
 
 const kafka = createKafka('gatekeeper');
 await waitForBroker(kafka);
@@ -13,7 +12,14 @@ app.listen(5002, () => console.log('Gatekeeper healthz on :5002'));
 
 const consentStore = new Map();
 const latestPrescription = new Map();
-const dedupe = createDedupe();
+const seenEvents = new Set();
+
+const isDuplicate = (eventId) => {
+  if (!eventId) return false;
+  if (seenEvents.has(eventId)) return true;
+  seenEvents.add(eventId);
+  return false;
+};
 
 const consentKey = (citizenId, grantedTo, scope) => `${citizenId}|${grantedTo}|${scope}`;
 
@@ -52,10 +58,9 @@ console.log('[gatekeeper] ready to process consent and RAW events');
 await consumer.run({
   eachMessage: async ({ topic, message }) => {
     const eventId = message.headers?.['x-event-id']?.toString();
-    if (eventId && dedupe.has(eventId)) {
+    if (isDuplicate(eventId)) {
       return;
     }
-    if (eventId) dedupe.add(eventId);
 
     const payload = JSON.parse(message.value.toString());
 
