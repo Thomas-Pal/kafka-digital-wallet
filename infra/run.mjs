@@ -65,8 +65,14 @@ const main = async () => {
   }
 
   if (mode === 'dev') {
+    await runCommand('npm run kill-ports');
+    await runCommand('npm run reset:kafka');
     await runCommand('npm run up:kafka');
     await runCommand('npm run topics');
+  }
+
+  if (mode === 'services') {
+    await runCommand('npm run kill-ports');
   }
 
   await runParallel(commands[mode]);
