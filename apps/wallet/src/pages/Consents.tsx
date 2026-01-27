@@ -40,8 +40,17 @@ export default function Consents() {
     if (!selectedRequest) {
       return;
     }
+    let consentId = selectedRequest.id;
     try {
-      await approveConsent(selectedRequest.id, durationDays);
+      const response = await approveConsent({
+        citizenId: selectedRequest.citizenId,
+        grantedTo: selectedRequest.rp,
+        scopes: selectedRequest.scopes,
+        ttlDays: durationDays,
+      });
+      if (response?.consent?.id) {
+        consentId = response.consent.id;
+      }
     } catch {
       // Orchestration may be offline in demo mode.
     }
@@ -50,6 +59,7 @@ export default function Consents() {
     setConsents((current) => [
       {
         ...selectedRequest,
+        id: consentId,
         status: 'granted',
         issuedAt,
         expiresAt,

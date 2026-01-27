@@ -1,8 +1,11 @@
-const BASE = import.meta.env.VITE_ORCH_URL ?? 'http://localhost:4000';
+const BASE =
+  import.meta.env.VITE_ORCH_URL ??
+  import.meta.env.VITE_ORCH_API ??
+  'http://localhost:4000';
 
 export async function fetchConsentInbox() {
   try {
-    const res = await fetch(`${BASE}/consent/inbox`);
+    const res = await fetch(`${BASE}/consent/pending`);
     if (!res.ok) {
       return { data: [], ok: false, status: res.status };
     }
@@ -13,20 +16,32 @@ export async function fetchConsentInbox() {
   }
 }
 
-export async function approveConsent(id: string, durationDays: number) {
-  const res = await fetch(`${BASE}/consent/approve`, {
+export async function approveConsent({
+  citizenId,
+  grantedTo,
+  scopes,
+  ttlDays,
+  caseId,
+}: {
+  citizenId: string;
+  grantedTo: string;
+  scopes: string[];
+  ttlDays: number;
+  caseId?: string;
+}) {
+  const res = await fetch(`${BASE}/consent/grant`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id, durationDays }),
+    body: JSON.stringify({ citizenId, grantedTo, scopes, ttlDays, caseId }),
   });
   return res.json();
 }
 
-export async function revokeConsent(id: string) {
+export async function revokeConsent(consentId: string) {
   const res = await fetch(`${BASE}/consent/revoke`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ id }),
+    body: JSON.stringify({ consentId }),
   });
   return res.json();
 }
@@ -35,10 +50,14 @@ export async function scenarioPublish(
   kind: 'nhs.prescriptions' | 'employment.termination',
   payload: unknown
 ) {
-  const res = await fetch(`${BASE}/scenario/publish`, {
+  const endpoint =
+    kind === 'nhs.prescriptions'
+      ? `${BASE}/triggers/nhs-prescription`
+      : `${BASE}/triggers/employment-termination`;
+  const res = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ kind, payload }),
+    body: JSON.stringify(payload),
   });
   return res.json();
 }
