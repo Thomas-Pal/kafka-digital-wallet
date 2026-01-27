@@ -1,0 +1,22 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Permitted View - DWP PIP",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "citizenId", "caseId", "caseType", "evidence", "reason", "grantedAt"],
+  "properties": {
+    "eventId": { "type": "string" },
+    "citizenId": { "type": "string" },
+    "caseId": { "type": "string" },
+    "caseType": { "type": "string", "enum": ["PIP"] },
+    "evidence": {
+      "type": "object",
+      "required": ["health"],
+      "properties": {
+        "health": { "type": "object" }
+      }
+    },
+    "reason": { "type": "string" },
+    "grantedAt": { "type": "string", "format": "date-time" }
+  }
+}

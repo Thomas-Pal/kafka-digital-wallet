@@ -1,0 +1,7 @@
+[
+  {"name":"consent.events","partitions":1,"retentionMs":604800000},
+  {"name":"employment.termination","partitions":1,"retentionMs":604800000},
+  {"name":"nhs.prescriptions","partitions":1,"retentionMs":604800000},
+  {"name":"views.permitted.dwp.uc","partitions":1,"retentionMs":604800000},
+  {"name":"views.permitted.dwp.pip","partitions":1,"retentionMs":604800000}
+]

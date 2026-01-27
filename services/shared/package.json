@@ -1,0 +1,11 @@
+{
+  "name": "@wallet/shared",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "ajv": "^8.17.1",
+    "ajv-formats": "^2.1.1",
+    "json-schema-to-ts": "^3.1.1",
+    "kafkajs": "^2.2.4"
+  }
+}
