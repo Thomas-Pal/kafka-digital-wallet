@@ -16,7 +16,7 @@
     "dev": "node infra/run.mjs dev",
     "stop": "npm run down:kafka",
     "kill-ports": "node -e \"['4000','5001','5002','5173','5174'].forEach((p)=>{try{require('child_process').execSync('lsof -i :'+p+' -sTCP:LISTEN -nP | awk \\\"NR>1 {print $2}\\\" | xargs kill -9 2>/dev/null || true')}catch(e){}})\"",
-    "reset:kafka": "podman pod rm -f pod_kafka-digital-wallet 2>/dev/null || true && podman rm -f kafka kafka-ui 2>/dev/null || true && podman volume prune -f",
+    "reset:kafka": "podman pod rm -f pod_kafka-digital-wallet 2>/dev/null || true && podman pod rm -f $(podman pod ps -q --filter name=kafka) 2>/dev/null || true && podman rm -f $(podman ps -aq --filter name=kafka) 2>/dev/null || true && podman volume prune -f",
     "dev:fresh": "npm run kill-ports && npm run reset:kafka && npm run dev"
   },
   "devDependencies": {
