@@ -41,9 +41,23 @@ export default function AppTabs() {
 
     const pollInbox = async () => {
       try {
-        const data: Array<{ id: string; rp: string; scopes: string[]; citizenId: string }> =
-          await fetchConsentInbox();
-        if (!mounted || !Array.isArray(data)) {
+        const response = await fetchConsentInbox();
+        if (!mounted) {
+          return;
+        }
+        if (!response.ok) {
+          if (response.status === 404) {
+            window.clearInterval(interval);
+          }
+          return;
+        }
+        const data = response.data as Array<{
+          id: string;
+          rp: string;
+          scopes: string[];
+          citizenId: string;
+        }>;
+        if (!Array.isArray(data)) {
           return;
         }
         const fresh = data.filter((item) => !knownIds.current.has(item.id));
@@ -58,8 +72,9 @@ export default function AppTabs() {
       }
     };
 
+    let interval = 0;
+    interval = window.setInterval(pollInbox, 4000);
     pollInbox();
-    const interval = window.setInterval(pollInbox, 4000);
     return () => {
       mounted = false;
       window.clearInterval(interval);

@@ -1,8 +1,16 @@
 const BASE = import.meta.env.VITE_ORCH_URL ?? 'http://localhost:4000';
 
 export async function fetchConsentInbox() {
-  const res = await fetch(`${BASE}/consent/inbox`);
-  return res.json();
+  try {
+    const res = await fetch(`${BASE}/consent/inbox`);
+    if (!res.ok) {
+      return { data: [], ok: false, status: res.status };
+    }
+    const data = await res.json().catch(() => []);
+    return { data, ok: true, status: res.status };
+  } catch {
+    return { data: [], ok: false, status: 0 };
+  }
 }
 
 export async function approveConsent(id: string, durationDays: number) {
