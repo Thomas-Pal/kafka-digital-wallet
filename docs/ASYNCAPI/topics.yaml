@@ -1,0 +1,74 @@
+asyncapi: '2.6.0'
+info:
+  title: Kafka Event Bus
+  version: 0.3.0
+servers:
+  local:
+    url: localhost:29092
+    protocol: kafka
+channels:
+  consent.events:
+    subscribe:
+      message:
+        $ref: '#/components/messages/ConsentEvent'
+  employment.termination:
+    subscribe:
+      message:
+        $ref: '#/components/messages/EmploymentTermination'
+  hmrc.p45.summary:
+    subscribe:
+      message:
+        $ref: '#/components/messages/HmrcP45Summary'
+  nhs.raw.prescriptions:
+    subscribe:
+      message:
+        $ref: '#/components/messages/NhsPrescriptionRaw'
+  views.permitted.dwp.uc:
+    publish:
+      message:
+        $ref: '#/components/messages/ViewDwpUc'
+  views.permitted.dwp.health:
+    publish:
+      message:
+        $ref: '#/components/messages/ViewDwpHealth'
+  views.permitted.coach.basic:
+    publish:
+      message:
+        $ref: '#/components/messages/ViewCoachBasic'
+components:
+  messages:
+    ConsentEvent:
+      name: ConsentEvent
+      title: Consent grant/revoke
+      payload:
+        type: object
+    EmploymentTermination:
+      name: EmploymentTermination
+      title: Employment termination RAW event
+      payload:
+        type: object
+    HmrcP45Summary:
+      name: HmrcP45Summary
+      title: HMRC P45 summary RAW event
+      payload:
+        type: object
+    NhsPrescriptionRaw:
+      name: NhsPrescriptionRaw
+      title: NHS prescription RAW event
+      payload:
+        type: object
+    ViewDwpUc:
+      name: ViewDwpUc
+      title: DWP UC permitted view
+      payload:
+        type: object
+    ViewDwpHealth:
+      name: ViewDwpHealth
+      title: DWP health permitted view
+      payload:
+        type: object
+    ViewCoachBasic:
+      name: ViewCoachBasic
+      title: Coach basic permitted view
+      payload:
+        type: object

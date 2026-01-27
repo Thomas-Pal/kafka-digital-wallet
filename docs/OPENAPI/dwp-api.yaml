@@ -1,0 +1,81 @@
+openapi: 3.0.3
+info:
+  title: DWP API
+  version: 0.3.0
+servers:
+  - url: https://{host}
+    variables:
+      host:
+        default: localhost:5001
+paths:
+  /api/cases:
+    get:
+      summary: List DWP cases
+      responses:
+        '200':
+          description: Case list
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/CaseSummary'
+  /api/case/{id}:
+    get:
+      summary: Fetch a DWP case
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Case detail
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CaseDetail'
+components:
+  schemas:
+    CaseSummary:
+      type: object
+      properties:
+        caseId:
+          type: string
+        citizenId:
+          type: string
+        caseType:
+          type: string
+        status:
+          type: string
+        evidenceCount:
+          type: integer
+        lastUpdate:
+          type: string
+          format: date-time
+    CaseDetail:
+      type: object
+      properties:
+        caseId:
+          type: string
+        citizenId:
+          type: string
+        caseType:
+          type: string
+        status:
+          type: string
+        evidence:
+          type: array
+          items:
+            type: object
+        timeline:
+          type: array
+          items:
+            type: object
+        createdAt:
+          type: string
+          format: date-time
+        lastUpdate:
+          type: string
+          format: date-time

@@ -4,9 +4,9 @@
 
 - RAW topics use source namespaces: `employment.termination`, `nhs.prescriptions`.
 - Consent topics are explicit: `consent.events`.
-- VIEW topics are scoped by consumer: `views.permitted.dwp.<caseType>`.
+- VIEW topics are scoped by consumer: `views.permitted.<consumer>.<caseType>`.
 
-## Topic list
+## Topic list (current PoC)
 
 | Topic | Purpose | Schema |
 | --- | --- | --- |
@@ -15,6 +15,17 @@
 | `nhs.prescriptions` | RAW prescription events | `services/shared/schemas/nhs.prescriptions.json` |
 | `views.permitted.dwp.uc` | VIEW events for Universal Credit | `services/shared/schemas/views.permitted.dwp.uc.json` |
 | `views.permitted.dwp.pip` | VIEW events for PIP | `services/shared/schemas/views.permitted.dwp.pip.json` |
+
+## Topic list (forward-ready)
+
+These topics align with the hosting-ready plan and can be added without breaking the current PoC.
+
+| Topic | Purpose |
+| --- | --- |
+| `hmrc.p45.summary` | Optional RAW income summary emitted alongside employment termination |
+| `nhs.raw.prescriptions` | RAW prescriptions namespace for external hosting |
+| `views.permitted.dwp.health` | VIEW events for DWP health evidence |
+| `views.permitted.coach.basic` | VIEW events for coach support cases |
 
 ## Sample payloads
 

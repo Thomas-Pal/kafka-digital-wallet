@@ -7,12 +7,15 @@
 - **Gatekeeper (services/gatekeeper)** — Consumes consent + RAW events, enforces rules, emits VIEW topics.
 - **DWP API (services/dwp-api)** — Consumes VIEW topics, exposes REST for the portal.
 - **DWP Portal (apps/dwp-portal)** — Caseworker UX (read-only).
+- **Coach API (planned)** — Consumes coach VIEW topics, exposes REST for coach workflows.
+- **Coach Portal (planned)** — Read-only coach UX for work support cases.
 
 ## Boundaries
 
 - Wallet talks **only** to Orchestration API over HTTP.
 - Orchestration API and Gatekeeper talk **only** through Kafka.
 - DWP Portal talks **only** to DWP API over HTTP.
+- Coach Portal talks **only** to Coach API over HTTP.
 
 ## Data flow (ASCII)
 
@@ -26,10 +29,10 @@ Orchestration API  ---> Kafka RAW topics (employment.termination / nhs.prescript
         |                    Gatekeeper (consent enforcement)
         |                          |
         |                          v
-        +----> Kafka consent.events +--> Kafka VIEW topics (views.permitted.dwp.*)
-                                           |
-                                           v
-                                       DWP API ----> DWP Portal
+        +----> Kafka consent.events +--> Kafka VIEW topics (views.permitted.dwp.* / views.permitted.coach.*)
+                                           |                         |
+                                           v                         v
+                                       DWP API ----> DWP Portal   Coach API ----> Coach Portal
 ```
 
 ## Notes
@@ -37,3 +40,4 @@ Orchestration API  ---> Kafka RAW topics (employment.termination / nhs.prescript
 - The Gatekeeper is the only component that can produce VIEW topics.
 - All Kafka producers set the message key to `citizenId` for ordering.
 - Kafka config supports SASL/TLS via environment variables for hosted PoC.
+- Each service logs correlation-friendly identifiers (`eventId`, `citizenId`, `caseId`) for traceability.
