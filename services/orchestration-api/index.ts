@@ -34,7 +34,15 @@ type AuditEntry = {
   detail?: string;
 };
 
-const pending = new Map<string, Record<string, unknown>>();
+type PendingConsent = {
+  id: string;
+  citizenId: string;
+  rp: string;
+  scopes: string[];
+  requestedAt: string;
+};
+
+const pending = new Map<string, PendingConsent>();
 const active = new Map<string, ConsentRecord>();
 const audit: AuditEntry[] = [];
 
@@ -68,9 +76,39 @@ app.get('/consent/audit', (_req, res) => {
   res.json(audit.slice().reverse());
 });
 
-app.post('/consent/grant', async (req, res) => {
-  const { citizenId, grantedTo = 'dwp', scopes, ttlDays = 90, caseId, eventId: bodyEventId } = req.body || {};
+app.post('/consent/request', (req, res) => {
+  const { citizenId, rp, grantedTo, scopes } = req.body || {};
   const scopeList = Array.isArray(scopes) ? scopes : scopes ? [scopes] : [];
+  const relyingParty = rp || grantedTo;
+  if (!citizenId || !relyingParty || scopeList.length === 0) {
+    return res.status(400).json({ ok: false, error: 'citizenId, rp, and scopes required' });
+  }
+
+  const requestId = uuid();
+  const request: PendingConsent = {
+    id: requestId,
+    citizenId,
+    rp: relyingParty,
+    scopes: scopeList,
+    requestedAt: new Date().toISOString(),
+  };
+  pending.set(requestId, request);
+  return res.json({ ok: true, request });
+});
+
+app.post('/consent/grant', async (req, res) => {
+  const {
+    citizenId,
+    grantedTo = 'dwp',
+    rp,
+    scopes,
+    ttlDays = 90,
+    caseId,
+    pendingId,
+    eventId: bodyEventId,
+  } = req.body || {};
+  const scopeList = Array.isArray(scopes) ? scopes : scopes ? [scopes] : [];
+  const relyingParty = rp || grantedTo;
   if (!citizenId || scopeList.length === 0) {
     return res.status(400).json({ ok: false, error: 'citizenId and scopes required' });
   }
@@ -83,7 +121,7 @@ app.post('/consent/grant', async (req, res) => {
   const consent: ConsentRecord = {
     id: consentId,
     citizenId,
-    grantedTo,
+    grantedTo: relyingParty,
     scopes: scopeList,
     ttlDays,
     issuedAt,
@@ -95,7 +133,7 @@ app.post('/consent/grant', async (req, res) => {
     eventId,
     type: 'grant',
     citizenId,
-    grantedTo,
+    grantedTo: relyingParty,
     scopes: scopeList,
     caseId,
     ttlDays,
@@ -106,10 +144,13 @@ app.post('/consent/grant', async (req, res) => {
     assertConsentEvent(consentEvent);
     await sendEvent({ topic: 'consent.events', key: citizenId, value: consentEvent, eventId });
     active.set(consentId, consent);
+    if (pendingId) {
+      pending.delete(pendingId);
+    }
     audit.push({
       id: uuid(),
       action: 'consent.granted',
-      grantedTo,
+      grantedTo: relyingParty,
       scopes: scopeList,
       at: issuedAt,
       detail: `Granted for ${ttlDays} days`,

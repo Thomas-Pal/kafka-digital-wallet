@@ -1,34 +1,42 @@
-import {
-  IonPage,
-  IonHeader,
-  IonToolbar,
-  IonTitle,
-  IonContent,
-  IonCard,
-  IonCardContent,
-} from '@ionic/react';
-import { useCitizenStore } from '../state/useCitizenStore';
-import Timeline from '../components/Timeline';
+import { IonCardContent, IonItem, IonLabel, IonList } from '@ionic/react';
+import { formatDistanceToNow } from 'date-fns';
+import PageShell from '../components/PageShell';
+import Section from '../components/Section';
+import Card from '../components/Card';
+import EmptyState from '../components/EmptyState';
+import { useWalletStore } from '../store/walletStore';
 
 export default function Activity() {
-  const activity = useCitizenStore((state) => state.activity);
+  const activity = useWalletStore((state) => state.activity);
 
   return (
-    <IonPage>
-      <IonHeader>
-        <IonToolbar className="header-gov">
-          <IonTitle>Activity</IonTitle>
-        </IonToolbar>
-      </IonHeader>
-      <IonContent className="ion-padding">
-        <IonCard className="gov-card">
+    <PageShell title="Activity" subtitle="Audit trail of requests and sharing">
+      <Section title="Recent events">
+        <Card>
           <IonCardContent>
-            <h3 className="gov-heading">Unified timeline</h3>
-            <p className="gov-subtitle">Consent, raw events, and permitted VIEW deliveries in one place.</p>
-            <Timeline items={activity} />
+            {activity.length === 0 ? (
+              <EmptyState
+                title="No activity yet"
+                body="Consent requests, approvals, and shares will appear here."
+              />
+            ) : (
+              <IonList lines="none">
+                {activity.map((item) => (
+                  <IonItem key={item.id}>
+                    <IonLabel>
+                      <strong>{item.summary}</strong>
+                      <p className="wallet-muted">{item.details}</p>
+                      <p className="wallet-caption">
+                        {formatDistanceToNow(new Date(item.ts), { addSuffix: true })}
+                      </p>
+                    </IonLabel>
+                  </IonItem>
+                ))}
+              </IonList>
+            )}
           </IonCardContent>
-        </IonCard>
-      </IonContent>
-    </IonPage>
+        </Card>
+      </Section>
+    </PageShell>
   );
 }

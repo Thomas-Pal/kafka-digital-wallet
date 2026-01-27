@@ -1,142 +1,240 @@
+import { useMemo, useState } from 'react';
 import {
-  IonPage,
-  IonHeader,
-  IonToolbar,
-  IonTitle,
-  IonContent,
-  IonGrid,
-  IonRow,
-  IonCol,
-  IonCard,
+  IonButton,
   IonCardContent,
-  IonList,
   IonItem,
   IonLabel,
-  IonButton,
-  IonBadge,
+  IonList,
 } from '@ionic/react';
-import { useEffect, useState } from 'react';
-import CitizenBanner from '../components/CitizenBanner';
-import StatPill from '../components/StatPill';
-import Timeline from '../components/Timeline';
-import { useCitizenStore } from '../state/useCitizenStore';
-import { fetchPendingConsents } from '../services/api';
-
-type PendingConsent = {
-  id: string;
-  grantedTo: string;
-  scopes: string[];
-  purpose?: string;
-  requestedAt: string;
-};
+import { addDays } from 'date-fns';
+import PageShell from '../components/PageShell';
+import Section from '../components/Section';
+import Card from '../components/Card';
+import ConsentRequestModal from '../components/ConsentRequestModal';
+import EmptyState from '../components/EmptyState';
+import { approveConsent } from '../api/client';
+import { useWalletStore } from '../store/walletStore';
 
 export default function Dashboard() {
-  const activity = useCitizenStore((state) => state.activity);
-  const [pending, setPending] = useState<PendingConsent[]>([]);
+  const credentials = useWalletStore((state) => state.credentials);
+  const consents = useWalletStore((state) => state.consents);
+  const inbox = useWalletStore((state) => state.inbox);
+  const activity = useWalletStore((state) => state.activity);
+  const setConsents = useWalletStore((state) => state.setConsents);
+  const addActivity = useWalletStore((state) => state.addActivity);
+  const removeInbox = useWalletStore((state) => state.removeInbox);
 
-  useEffect(() => {
-    let mounted = true;
-    const load = async () => {
-      const response = await fetchPendingConsents();
-      if (mounted && response.ok) {
-        setPending((response.data as PendingConsent[]) || []);
+  const [selectedRequest, setSelectedRequest] = useState(
+    inbox.length > 0 ? inbox[0] : null
+  );
+
+  const activeConsents = useMemo(
+    () => consents.filter((item) => item.status === 'granted'),
+    [consents]
+  );
+
+  const recentActivity = activity.slice(0, 3);
+
+  const handleApprove = async (durationDays: number) => {
+    if (!selectedRequest) {
+      return;
+    }
+    let consentId = selectedRequest.id;
+    try {
+      const response = await approveConsent({
+        citizenId: selectedRequest.citizenId,
+        grantedTo: selectedRequest.rp,
+        scopes: selectedRequest.scopes,
+        ttlDays: durationDays,
+        pendingId: selectedRequest.id,
+      });
+      if (response?.consent?.id) {
+        consentId = response.consent.id;
       }
-    };
-    load();
-    const interval = setInterval(load, 4000);
-    return () => {
-      mounted = false;
-      clearInterval(interval);
-    };
-  }, []);
+    } catch {
+      // Orchestration may be offline in demo mode.
+    }
+    const issuedAt = new Date().toISOString();
+    const expiresAt = addDays(new Date(), durationDays).toISOString();
+    setConsents((current) => [
+      {
+        ...selectedRequest,
+        id: consentId,
+        status: 'granted',
+        issuedAt,
+        expiresAt,
+      },
+      ...current,
+    ]);
+    addActivity({
+      id: crypto.randomUUID(),
+      ts: new Date().toISOString(),
+      kind: 'grant',
+      summary: `Consent granted to ${selectedRequest.rp.toUpperCase()}`,
+      details: selectedRequest.scopes.join(', '),
+    });
+    removeInbox(selectedRequest.id);
+    setSelectedRequest(null);
+  };
+
+  const handleDeny = async () => {
+    if (!selectedRequest) {
+      return;
+    }
+    addActivity({
+      id: crypto.randomUUID(),
+      ts: new Date().toISOString(),
+      kind: 'revoke',
+      summary: `Consent denied for ${selectedRequest.rp.toUpperCase()}`,
+      details: selectedRequest.scopes.join(', '),
+    });
+    removeInbox(selectedRequest.id);
+    setSelectedRequest(null);
+  };
 
   return (
-    <IonPage>
-      <IonHeader>
-        <IonToolbar className="header-gov">
-          <IonTitle>Digital Wallet Dashboard</IonTitle>
-        </IonToolbar>
-      </IonHeader>
-      <IonContent className="ion-padding">
-        <CitizenBanner />
-
-        <IonGrid>
-          <IonRow>
-            <IonCol size="12" sizeMd="4">
-              <StatPill label="Pending consent requests" value={`${pending.length}`} tone="warning" />
-            </IonCol>
-            <IonCol size="12" sizeMd="4">
-              <StatPill label="Active grants" value="2" tone="success" />
-            </IonCol>
-            <IonCol size="12" sizeMd="4">
-              <StatPill label="Last activity" value="10:33" tone="tertiary" />
-            </IonCol>
-          </IonRow>
-        </IonGrid>
-
-        <IonCard className="gov-card">
+    <PageShell
+      title="Dashboard"
+      subtitle="You control what to share. Requests appear in your inbox."
+    >
+      {inbox.length > 0 ? (
+        <Card className="wallet-inbox">
           <IonCardContent>
-            <h3 className="gov-heading">Quick actions</h3>
-            <IonList>
-              <IonItem routerLink="/consents">
-                <IonLabel>Grant DWP access</IonLabel>
-              </IonItem>
-              <IonItem routerLink="/health">
-                <IonLabel>Share health evidence</IonLabel>
-              </IonItem>
-              <IonItem routerLink="/activity">
-                <IonLabel>View audit trail</IonLabel>
-              </IonItem>
-            </IonList>
+            <h3 className="wallet-card-title">Inbox</h3>
+            <p className="wallet-muted">
+              {inbox.length} consent request{inbox.length === 1 ? '' : 's'} waiting
+              for your decision.
+            </p>
+            <IonButton
+              className="wallet-primary-button"
+              onClick={() => setSelectedRequest(inbox[0])}
+            >
+              Review request
+            </IonButton>
           </IonCardContent>
-        </IonCard>
+        </Card>
+      ) : null}
 
-        <IonCard className="gov-card">
+      <Section title="Overview">
+        <div className="wallet-grid">
+          <Card>
+            <IonCardContent>
+              <p className="wallet-stat-label">Your credentials</p>
+              <p className="wallet-stat-value">{credentials.length}</p>
+              <IonButton size="small" fill="clear" routerLink="/credentials">
+                View credentials
+              </IonButton>
+            </IonCardContent>
+          </Card>
+          <Card>
+            <IonCardContent>
+              <p className="wallet-stat-label">Active consents</p>
+              <p className="wallet-stat-value">{activeConsents.length}</p>
+              <IonButton size="small" fill="clear" routerLink="/consents">
+                Manage consents
+              </IonButton>
+            </IonCardContent>
+          </Card>
+          <Card>
+            <IonCardContent>
+              <p className="wallet-stat-label">Recent activity</p>
+              <p className="wallet-stat-value">{recentActivity.length}</p>
+              <IonButton size="small" fill="clear" routerLink="/activity">
+                View activity
+              </IonButton>
+            </IonCardContent>
+          </Card>
+        </div>
+      </Section>
+
+      <Section title="Your credentials">
+        <Card>
           <IonCardContent>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <h3 className="gov-heading" style={{ marginBottom: 0 }}>Pending consent requests</h3>
-              <IonBadge className="gov-badge gov-badge--warning">{pending.length}</IonBadge>
-            </div>
-            {pending.length === 0 ? (
-              <p style={{ color: '#6b7280' }}>No pending requests right now.</p>
+            {credentials.length === 0 ? (
+              <EmptyState
+                title="No credentials yet"
+                body="Your verified credentials will show here once issued."
+              />
             ) : (
-              <IonList>
-                {pending.map((request) => (
-                  <IonItem key={request.id} routerLink="/consents">
+              <IonList lines="none">
+                {credentials.slice(0, 3).map((credential) => (
+                  <IonItem key={credential.id}>
                     <IonLabel>
-                      <h4>Share data with {request.grantedTo?.toUpperCase()}</h4>
-                      <p>{request.purpose || 'Access requested to help prefill your claim.'}</p>
+                      <strong>{credential.type}</strong>
+                      <p className="wallet-muted">{credential.issuer}</p>
                     </IonLabel>
-                    <IonBadge color="medium">{request.scopes.length} scopes</IonBadge>
                   </IonItem>
                 ))}
               </IonList>
             )}
-          </IonCardContent>
-        </IonCard>
-
-        <IonCard className="gov-card">
-          <IonCardContent>
-            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-              <h3 className="gov-heading" style={{ marginBottom: 0 }}>Latest activity</h3>
-              <IonButton size="small" fill="clear" routerLink="/activity">
-                View all
-              </IonButton>
-            </div>
-            <Timeline items={activity.slice(0, 5)} />
-          </IonCardContent>
-        </IonCard>
-
-        <IonCard className="gov-card">
-          <IonCardContent>
-            <h3 className="gov-heading">Scenario Lab (internal)</h3>
-            <p className="gov-subtitle">Publish mock events without leaving the Wallet.</p>
-            <IonButton routerLink="/scenario-lab" className="gov-button" expand="block">
-              Open Scenario Lab
+            <IonButton fill="clear" routerLink="/credentials">
+              See all credentials
             </IonButton>
           </IonCardContent>
-        </IonCard>
-      </IonContent>
-    </IonPage>
+        </Card>
+      </Section>
+
+      <Section title="Active consents">
+        <Card>
+          <IonCardContent>
+            {activeConsents.length === 0 ? (
+              <EmptyState
+                title="No active consents"
+                body="When you approve a request, it will appear here."
+              />
+            ) : (
+              <IonList lines="none">
+                {activeConsents.slice(0, 3).map((consent) => (
+                  <IonItem key={consent.id}>
+                    <IonLabel>
+                      <strong>{consent.rp.toUpperCase()}</strong>
+                      <p className="wallet-muted">{consent.scopes.join(', ')}</p>
+                    </IonLabel>
+                  </IonItem>
+                ))}
+              </IonList>
+            )}
+            <IonButton fill="clear" routerLink="/consents">
+              View all consents
+            </IonButton>
+          </IonCardContent>
+        </Card>
+      </Section>
+
+      <Section title="Recent activity">
+        <Card>
+          <IonCardContent>
+            {recentActivity.length === 0 ? (
+              <EmptyState
+                title="No activity yet"
+                body="Actions like approvals and shares will be logged here."
+              />
+            ) : (
+              <IonList lines="none">
+                {recentActivity.map((item) => (
+                  <IonItem key={item.id}>
+                    <IonLabel>
+                      <strong>{item.summary}</strong>
+                      <p className="wallet-muted">{item.details}</p>
+                    </IonLabel>
+                  </IonItem>
+                ))}
+              </IonList>
+            )}
+            <IonButton fill="clear" routerLink="/activity">
+              See full activity
+            </IonButton>
+          </IonCardContent>
+        </Card>
+      </Section>
+
+      <ConsentRequestModal
+        isOpen={Boolean(selectedRequest)}
+        request={selectedRequest}
+        onDismiss={() => setSelectedRequest(null)}
+        onApprove={handleApprove}
+        onDeny={handleDeny}
+      />
+    </PageShell>
   );
 }

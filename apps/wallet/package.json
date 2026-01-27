@@ -9,6 +9,8 @@
   },
   "dependencies": {
     "@ionic/react": "^8.1.0",
+    "clsx": "^2.1.1",
+    "date-fns": "^3.6.0",
     "ionicons": "^7.2.2",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",

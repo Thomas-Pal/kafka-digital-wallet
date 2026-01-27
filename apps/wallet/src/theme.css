@@ -1,150 +1,203 @@
 :root {
-  --govuk-blue: #1d70b8;
-  --govuk-yellow: #ffbf47;
-  --govuk-green: #00703c;
-  --govuk-red: #d4351c;
-  --govuk-grey: #f3f2f1;
-  --govuk-light-grey: #f8f8f8;
-  --govuk-dark-grey: #505a5f;
-  --govuk-text: #0b0c0c;
-  --govuk-border: #b1b4b6;
-  --govuk-focus: #ffdd00;
+  --wallet-bg: #f8fafc;
+  --wallet-surface: #ffffff;
+  --wallet-primary: #2563eb;
+  --wallet-text: #0f172a;
+  --wallet-muted: #64748b;
+  --wallet-border: #e2e8f0;
+  --wallet-accent: #0ea5e9;
 }
 
 body {
-  color: var(--govuk-text);
-  font-family: "GDS Transport", "Helvetica Neue", Arial, sans-serif;
-  letter-spacing: 0.1px;
+  color: var(--wallet-text);
+  font-family: 'Inter', 'Segoe UI', system-ui, sans-serif;
+  background: var(--wallet-bg);
 }
 
-.header-gov {
-  background: var(--govuk-blue);
-  color: white;
+.wallet-header ion-toolbar {
+  --background: var(--wallet-surface);
+  --border-color: var(--wallet-border);
+  --color: var(--wallet-text);
+  font-weight: 600;
 }
 
-.header-gov ion-title {
-  font-size: 20px;
-  font-weight: 700;
+.wallet-subheader ion-toolbar {
+  --background: var(--wallet-surface);
+  --color: var(--wallet-muted);
 }
 
-.gov-tabbar {
-  --background: var(--govuk-light-grey);
-  border-top: 1px solid var(--govuk-border);
-}
-
-.gov-tabbar ion-tab-button {
-  --color: var(--govuk-dark-grey);
-  --color-selected: var(--govuk-blue);
-}
-
-.gov-card {
-  border-radius: 14px;
-  border: 1px solid var(--govuk-border);
-  box-shadow: 0 8px 18px rgba(15, 23, 42, 0.06);
-}
-
-.stat-pill {
-  border-radius: 12px;
-  background: var(--govuk-light-grey);
-  border: 1px solid var(--govuk-border);
-}
-
-.stat-pill.primary {
-  border-left: 6px solid var(--govuk-blue);
-}
-
-.stat-pill.success {
-  border-left: 6px solid var(--govuk-green);
-}
-
-.stat-pill.warning {
-  border-left: 6px solid var(--govuk-yellow);
-}
-
-.stat-pill.tertiary {
-  border-left: 6px solid #6b7280;
-}
-
-.stat-callout {
-  background: var(--govuk-grey);
-  border-radius: 8px;
-  padding: 12px 14px;
+.wallet-subtitle {
   font-size: 14px;
-  border-left: 4px solid var(--govuk-blue);
+  padding: 0 16px 12px;
 }
 
-.gov-button {
-  --background: var(--govuk-blue);
-  --border-radius: 6px;
-  font-weight: 600;
+.wallet-content {
+  --background: var(--wallet-bg);
 }
 
-.gov-button:focus-visible {
-  outline: 3px solid var(--govuk-focus);
-  outline-offset: 2px;
+.wallet-page {
+  padding: 20px 16px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
 }
 
-.gov-heading {
-  font-weight: 700;
-  letter-spacing: 0.2px;
-}
-
-.gov-subtitle {
-  color: var(--govuk-dark-grey);
-  font-size: 14px;
-}
-
-.gov-caption {
-  color: var(--govuk-dark-grey);
-  font-size: 12px;
-  text-transform: uppercase;
-  letter-spacing: 0.04em;
-}
-
-.gov-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 10px;
-  border-radius: 999px;
-  font-size: 12px;
-  font-weight: 600;
-  background: var(--govuk-light-grey);
-  border: 1px solid var(--govuk-border);
-}
-
-.gov-badge--success {
-  color: var(--govuk-green);
-}
-
-.gov-badge--warning {
-  color: #924f00;
-}
-
-.gov-link {
-  color: var(--govuk-blue);
-  text-decoration: underline;
-  font-weight: 600;
-}
-
-.gov-link:focus-visible {
-  outline: 3px solid var(--govuk-focus);
-  outline-offset: 2px;
-}
-
-.gov-section {
-  display: grid;
+.wallet-section {
+  display: flex;
+  flex-direction: column;
   gap: 12px;
 }
 
-.gov-divider {
-  height: 1px;
-  background: var(--govuk-border);
-  margin: 12px 0;
+.wallet-section-title {
+  font-size: 18px;
+  font-weight: 600;
+}
+
+.wallet-section-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.wallet-card {
+  border-radius: 16px;
+  border: 1px solid var(--wallet-border);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  background: var(--wallet-surface);
+}
+
+.wallet-card-title {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.wallet-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.wallet-grid-two {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.wallet-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.wallet-muted {
+  color: var(--wallet-muted);
+  font-size: 14px;
+}
+
+.wallet-caption {
+  color: var(--wallet-muted);
+  font-size: 12px;
+  margin-top: 8px;
+}
+
+.wallet-field-label {
+  color: var(--wallet-muted);
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.wallet-field-value {
+  font-size: 16px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+.wallet-stat-label {
+  color: var(--wallet-muted);
+  font-size: 14px;
+  margin-bottom: 6px;
+}
+
+.wallet-stat-value {
+  font-size: 28px;
+  font-weight: 700;
+  margin: 0 0 12px;
+}
+
+.wallet-primary-button {
+  --background: var(--wallet-primary);
+  --border-radius: 10px;
+  font-weight: 600;
+}
+
+.wallet-empty {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px 0;
+}
+
+.wallet-empty-title {
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.wallet-empty-body {
+  color: var(--wallet-muted);
+  font-size: 14px;
+}
+
+.wallet-empty-action {
+  margin-top: 8px;
+}
+
+.wallet-credential-body {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wallet-tabbar {
+  --background: var(--wallet-surface);
+  border-top: 1px solid var(--wallet-border);
+}
+
+.wallet-modal {
+  --background: var(--wallet-bg);
+}
+
+.wallet-modal-actions {
+  display: grid;
+  gap: 12px;
+  padding: 16px;
+}
+
+.wallet-scope-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.wallet-scope-chip {
+  background: rgba(37, 99, 235, 0.1);
+  color: var(--wallet-primary);
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.wallet-accordion {
+  padding: 12px 0;
+}
+
+.wallet-inbox {
+  border-left: 4px solid var(--wallet-accent);
 }
 
 ion-item::part(native) {
   --padding-start: 12px;
   --inner-padding-end: 12px;
-  border-radius: 8px;
 }
