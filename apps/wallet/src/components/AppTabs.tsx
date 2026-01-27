@@ -8,7 +8,7 @@ import {
   IonTabs,
   IonToast,
 } from '@ionic/react';
-import { Redirect, Route } from 'react-router-dom';
+import { Navigate, Route } from 'react-router-dom';
 import {
   albumsOutline,
   flaskOutline,
@@ -75,7 +75,7 @@ export default function AppTabs() {
         <Route path="/consents" component={Consents} exact />
         <Route path="/activity" component={Activity} exact />
         <Route path="/scenarios" component={ScenariosLab} exact />
-        <Redirect exact from="/" to="/dashboard" />
+        <Route path="/" element={<Navigate to="/dashboard" replace />} />
       </IonRouterOutlet>
 
       <IonTabBar slot="bottom" className="wallet-tabbar">
