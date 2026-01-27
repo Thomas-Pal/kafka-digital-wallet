@@ -5,10 +5,8 @@ topics=(
   consent.events
   nhs.prescriptions
   employment.termination
-  hmrc.p45.summary
   views.permitted.dwp.uc
-  views.permitted.dwp.disability
-  views.permitted.coach.basic
+  views.permitted.dwp.pip
 )
 if [[ "${RESET_TOPICS:-0}" == "1" ]]; then
   for t in "${topics[@]}"; do

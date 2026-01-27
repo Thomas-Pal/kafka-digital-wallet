@@ -5,65 +5,84 @@ import {
   IonTitle,
   IonContent,
   IonCard,
-  IonCardHeader,
-  IonCardTitle,
   IonCardContent,
-  IonGrid,
-  IonRow,
-  IonCol,
-  IonChip,
+  IonList,
+  IonItem,
+  IonLabel,
+  IonToggle,
 } from '@ionic/react';
+import { useCitizenStore } from '../state/useCitizenStore';
 
 export default function HMRC() {
+  const hmrc = useCitizenStore((state) => state.hmrc);
+
   return (
     <IonPage>
       <IonHeader>
-        <IonToolbar color="primary">
+        <IonToolbar className="header-gov">
           <IonTitle>HMRC</IonTitle>
         </IonToolbar>
       </IonHeader>
-      <IonContent>
-        <IonCard>
-          <IonCardHeader>
-            <IonCardTitle>Tax & Employment Record</IonCardTitle>
-          </IonCardHeader>
+      <IonContent className="ion-padding">
+        <IonCard className="gov-card">
           <IonCardContent>
-            <IonGrid>
-              <IonRow>
-                <IonCol size="12" sizeMd="6">
-                  <h3 style={{ marginTop: 0 }}>PAYE snapshot</h3>
-                  <p style={{ margin: '6px 0' }}>Tax code: 1257L · NI: QQ123456C</p>
-                  <p style={{ margin: '6px 0', color: '#666' }}>
-                    Year-to-date gross: £25,875.12 · Tax paid: £3,275.54
-                  </p>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    <IonChip color="success">HMRC record verified</IonChip>
-                    <IonChip color="warning">P45 issued</IonChip>
-                  </div>
-                </IonCol>
-                <IonCol size="12" sizeMd="6">
-                  <h4 style={{ marginTop: 0 }}>Employer summary</h4>
-                  <p style={{ margin: '6px 0' }}>Acme Widgets Ltd · Leaving date: 22 Jan 2026</p>
-                  <p style={{ margin: '6px 0', color: '#666' }}>
-                    This data is linked to your benefits case only after you approve a consent request.
-                  </p>
-                </IonCol>
-              </IonRow>
-            </IonGrid>
+            <h3 className="gov-heading">National Insurance</h3>
+            <IonList>
+              <IonItem>
+                <IonLabel>
+                  <h4>NI Number</h4>
+                  <p>{hmrc.niNumber}</p>
+                </IonLabel>
+              </IonItem>
+            </IonList>
           </IonCardContent>
         </IonCard>
-        <IonCard>
-          <IonCardHeader>
-            <IonCardTitle>Why it matters</IonCardTitle>
-          </IonCardHeader>
+
+        <IonCard className="gov-card">
           <IonCardContent>
-            <p style={{ marginTop: 0 }}>
-              Verified HMRC summaries reduce manual evidence requests and speed up benefit
-              decisions by sharing tax and employment data directly from source.
-            </p>
-            <p style={{ marginTop: 12, color: '#666' }}>
-              You stay in control: sharing only begins after a consent request is approved.
-            </p>
+            <h3 className="gov-heading">P45 / P60</h3>
+            <IonList>
+              <IonItem>
+                <IonLabel>
+                  <h4>Latest P45</h4>
+                  <p>{hmrc.latestP45}</p>
+                </IonLabel>
+              </IonItem>
+              <IonItem>
+                <IonLabel>
+                  <h4>Latest P60</h4>
+                  <p>{hmrc.latestP60}</p>
+                </IonLabel>
+              </IonItem>
+              <IonItem>
+                <IonLabel>
+                  <h4>PAYE summary</h4>
+                  <p>{hmrc.payeYtd} (YTD)</p>
+                </IonLabel>
+              </IonItem>
+              <IonItem>
+                <IonLabel>
+                  <h4>Declared income</h4>
+                  <p>{hmrc.declaredIncome}</p>
+                </IonLabel>
+              </IonItem>
+            </IonList>
+          </IonCardContent>
+        </IonCard>
+
+        <IonCard className="gov-card">
+          <IonCardContent>
+            <h3 className="gov-heading">HMRC ↔ DWP sharing</h3>
+            <IonList>
+              <IonItem>
+                <IonLabel>Allow HMRC data for UC evidence</IonLabel>
+                <IonToggle checked={true} disabled />
+              </IonItem>
+              <IonItem>
+                <IonLabel>Allow HMRC data for audit trail</IonLabel>
+                <IonToggle checked={false} disabled />
+              </IonItem>
+            </IonList>
           </IonCardContent>
         </IonCard>
       </IonContent>

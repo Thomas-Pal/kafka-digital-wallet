@@ -11,12 +11,8 @@
     "uuid": "^9.0.1"
   },
   "scripts": {
-    "orchestration-api": "node orchestration-api.js",
-    "gatekeeper": "node gatekeeper.js",
-    "dwp": "node dwp-service.js",
-    "hmrc-api": "node hmrc-api.js",
-    "coach-api": "node coach-api.js",
-    "demo-sim": "node demo-sim.js",
-    "produce:nhs": "node mock-nhs-producer.js"
+    "orchestration-api": "node apps/orchestration/index.js",
+    "gatekeeper": "node apps/gatekeeper/index.js",
+    "dwp-api": "node apps/dwp-api/index.js"
   }
 }

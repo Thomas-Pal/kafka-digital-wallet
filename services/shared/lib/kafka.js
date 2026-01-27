@@ -17,7 +17,3 @@ export async function waitForBroker(kafka) {
   await admin.fetchTopicMetadata();
   await admin.disconnect();
 }
-
-export function viewTopic(caseId, citizenId) {
-  return `views.permitted.dwp.${caseId}.${citizenId}`;
-}
