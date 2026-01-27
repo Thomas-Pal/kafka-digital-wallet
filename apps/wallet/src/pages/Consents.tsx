@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   IonAccordion,
   IonAccordionGroup,
@@ -9,6 +9,7 @@ import {
   IonList,
 } from '@ionic/react';
 import { addDays, format } from 'date-fns';
+import { useLocation } from 'react-router-dom';
 import PageShell from '../components/PageShell';
 import Section from '../components/Section';
 import Card from '../components/Card';
@@ -23,6 +24,7 @@ export default function Consents() {
   const setConsents = useWalletStore((state) => state.setConsents);
   const addActivity = useWalletStore((state) => state.addActivity);
   const removeInbox = useWalletStore((state) => state.removeInbox);
+  const location = useLocation();
   const [selectedRequest, setSelectedRequest] = useState(
     inbox.length > 0 ? inbox[0] : null
   );
@@ -35,6 +37,16 @@ export default function Consents() {
     () => consents.filter((item) => item.status !== 'granted'),
     [consents]
   );
+
+  useEffect(() => {
+    const params = new URLSearchParams(location.search);
+    const requestId = params.get('requestId');
+    if (!requestId) return;
+    const match = inbox.find((item) => item.id === requestId);
+    if (match) {
+      setSelectedRequest(match);
+    }
+  }, [inbox, location.search]);
 
   const handleApprove = async (durationDays: number) => {
     if (!selectedRequest) {

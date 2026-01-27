@@ -1,4 +1,5 @@
 const BASE =
+  import.meta.env.VITE_ORCH_BASE_URL ??
   import.meta.env.VITE_ORCH_URL ??
   import.meta.env.VITE_ORCH_API ??
   'http://localhost:4000';
@@ -71,8 +72,8 @@ export async function scenarioPublish(
 ) {
   const endpoint =
     kind === 'nhs.prescriptions'
-      ? `${BASE}/triggers/nhs-prescription`
-      : `${BASE}/triggers/employment-termination`;
+      ? `${BASE}/scenarios/prescription-issued`
+      : `${BASE}/scenarios/employment-termination`;
   const res = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

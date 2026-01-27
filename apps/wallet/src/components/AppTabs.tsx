@@ -8,7 +8,7 @@ import {
   IonTabs,
   IonToast,
 } from '@ionic/react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import {
   albumsOutline,
   flaskOutline,
@@ -25,16 +25,48 @@ import Activity from '../pages/Activity';
 import ScenariosLab from '../pages/ScenariosLab';
 import { fetchConsentInbox } from '../api/client';
 import { useWalletStore } from '../store/walletStore';
+import { startNotifications } from '../lib/notifications';
 
 export default function AppTabs() {
+  const navigate = useNavigate();
   const inbox = useWalletStore((state) => state.inbox);
   const pushInbox = useWalletStore((state) => state.pushInbox);
+  const citizenId = useWalletStore((state) => state.citizen.id);
+  const addActivity = useWalletStore((state) => state.addActivity);
   const [toastMessage, setToastMessage] = useState('');
+  const [notificationToast, setNotificationToast] = useState<{
+    title: string;
+    message: string;
+    action?: { label: string; href: string };
+  } | null>(null);
   const knownIds = useRef(new Set(inbox.map((item) => item.id)));
+  const knownNotifications = useRef(new Set<string>());
 
   useEffect(() => {
     knownIds.current = new Set(inbox.map((item) => item.id));
   }, [inbox]);
+
+  useEffect(() => {
+    const stop = startNotifications(citizenId, (notification) => {
+      if (knownNotifications.current.has(notification.id)) {
+        return;
+      }
+      knownNotifications.current.add(notification.id);
+      setNotificationToast({
+        title: notification.title,
+        message: notification.body,
+        action: notification.action,
+      });
+      addActivity({
+        id: notification.id,
+        ts: notification.createdAt,
+        kind: 'request',
+        summary: notification.title,
+        details: notification.body,
+      });
+    });
+    return () => stop();
+  }, [addActivity, citizenId]);
 
   useEffect(() => {
     let mounted = true;
@@ -129,6 +161,28 @@ export default function AppTabs() {
         onDidDismiss={() => setToastMessage('')}
         position="top"
         color="primary"
+      />
+      <IonToast
+        isOpen={Boolean(notificationToast)}
+        header={notificationToast?.title}
+        message={notificationToast?.message}
+        duration={6000}
+        onDidDismiss={() => setNotificationToast(null)}
+        position="top"
+        color="tertiary"
+        buttons={
+          notificationToast?.action
+            ? [
+                {
+                  text: notificationToast.action.label,
+                  handler: () => {
+                    navigate(notificationToast.action?.href ?? '/consents');
+                    setNotificationToast(null);
+                  },
+                },
+              ]
+            : undefined
+        }
       />
     </IonTabs>
   );

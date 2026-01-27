@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   IonButton,
   IonButtons,
@@ -13,6 +13,7 @@ import {
   IonTitle,
   IonToolbar,
 } from '@ionic/react';
+import type { ConsentRequest } from '../store/walletStore';
 
 const durationOptions = [
   { label: '1 day', value: 1 },
@@ -37,12 +38,19 @@ export default function ConsentRequestModal({
 }: {
   isOpen: boolean;
   onDismiss: () => void;
-  request: { id: string; rp: string; scopes: string[]; citizenId: string } | null;
+  request: ConsentRequest | null;
   onApprove: (durationDays: number) => void | Promise<void>;
   onDeny: () => void | Promise<void>;
 }) {
   const [duration, setDuration] = useState(7);
   const scopeList = useMemo(() => request?.scopes ?? [], [request]);
+  const purpose = request?.purpose;
+
+  useEffect(() => {
+    if (request?.durationDays) {
+      setDuration(request.durationDays);
+    }
+  }, [request]);
 
   return (
     <IonModal isOpen={isOpen} onDidDismiss={onDismiss}>
@@ -63,6 +71,14 @@ export default function ConsentRequestModal({
                 <p className="wallet-muted">{request.rp.toUpperCase()}</p>
               </IonLabel>
             </IonItem>
+            {purpose ? (
+              <IonItem lines="none">
+                <IonLabel>
+                  <strong>Purpose</strong>
+                  <p className="wallet-muted">{purpose}</p>
+                </IonLabel>
+              </IonItem>
+            ) : null}
             <IonItem lines="none">
               <IonLabel>
                 <strong>Scopes</strong>
