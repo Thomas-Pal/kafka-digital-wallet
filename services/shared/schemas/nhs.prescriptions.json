@@ -1,0 +1,28 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "NHS Prescriptions",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "citizenId",
+    "drug",
+    "dosage",
+    "frequency",
+    "repeat",
+    "gpOdsCode",
+    "condition",
+    "prescribedAt"
+  ],
+  "properties": {
+    "eventId": { "type": "string" },
+    "citizenId": { "type": "string" },
+    "drug": { "type": "string" },
+    "dosage": { "type": "string" },
+    "frequency": { "type": "string" },
+    "repeat": { "type": "boolean" },
+    "gpOdsCode": { "type": "string" },
+    "condition": { "type": "string" },
+    "prescribedAt": { "type": "string", "format": "date-time" }
+  }
+}

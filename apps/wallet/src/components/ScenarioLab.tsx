@@ -87,7 +87,7 @@ export default function ScenarioLab() {
       </IonHeader>
       <IonContent className="ion-padding">
         <IonText color="medium">
-          <p className="gov-subtitle">Use these controls to publish mock real-world events. Buttons are idempotent and disable while publishing.</p>
+          <p className="gov-subtitle">Use these controls to publish mock real-world events. Buttons disable while publishing.</p>
         </IonText>
 
         <IonCard className="gov-card">

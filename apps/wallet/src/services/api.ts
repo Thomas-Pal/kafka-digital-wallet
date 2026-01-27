@@ -47,16 +47,8 @@ export function fetchAudit() {
   return request('/consent/audit');
 }
 
-export function requestConsent(payload: Record<string, unknown>) {
-  return postWithIdempotency('/consent/request', payload);
-}
-
 export function grantConsent(payload: Record<string, unknown>) {
   return postWithIdempotency('/consent/grant', payload);
-}
-
-export function denyConsent(payload: Record<string, unknown>) {
-  return postWithIdempotency('/consent/deny', payload);
 }
 
 export function revokeConsent(payload: Record<string, unknown>) {

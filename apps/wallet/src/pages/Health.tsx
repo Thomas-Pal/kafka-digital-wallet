@@ -34,7 +34,6 @@ export default function Health() {
       scopes: ['nhs.prescriptions'],
       ttlDays,
       caseId: 'pip-9001',
-      purpose: 'DWP requests access to NHS prescriptions to support PIP evidence.',
     });
     setSubmitting(false);
     setShowModal(false);

@@ -16,7 +16,7 @@ import {
 } from '@ionic/react';
 import { useEffect, useMemo, useState } from 'react';
 import ConsentCenter from '../components/ConsentCenter';
-import { denyConsent, fetchActiveConsents, fetchAudit, fetchPendingConsents, grantConsent, revokeConsent } from '../services/api';
+import { fetchActiveConsents, fetchAudit, fetchPendingConsents, grantConsent, revokeConsent } from '../services/api';
 
 const segmentOptions = ['pending', 'active', 'audit'] as const;
 
@@ -76,7 +76,6 @@ export default function Consents() {
 
   const handleApprove = async (request: PendingConsent, ttlDays: number) => {
     const response = await grantConsent({
-      requestId: request.id,
       citizenId: request.citizenId,
       grantedTo: request.grantedTo,
       scopes: request.scopes,
@@ -86,16 +85,6 @@ export default function Consents() {
     setToast({
       open: true,
       message: response.ok ? 'Consent granted.' : response.error || 'Grant failed.',
-      color: response.ok ? 'success' : 'danger',
-    });
-    load();
-  };
-
-  const handleDeny = async (request: PendingConsent) => {
-    const response = await denyConsent({ requestId: request.id });
-    setToast({
-      open: true,
-      message: response.ok ? 'Request denied.' : response.error || 'Deny failed.',
       color: response.ok ? 'success' : 'danger',
     });
     load();
@@ -136,9 +125,6 @@ export default function Consents() {
                     <IonButton size="small" onClick={() => handleApprove(request, 90)}>Allow 3 months</IonButton>
                     <IonButton size="small" fill="outline" onClick={() => handleApprove(request, 30)}>Allow 1 month</IonButton>
                     <IonButton size="small" fill="outline" onClick={() => handleApprove(request, 7)}>Allow 1 week</IonButton>
-                    <IonButton size="small" color="medium" fill="clear" onClick={() => handleDeny(request)}>
-                      Deny
-                    </IonButton>
                   </div>
                 </IonItem>
               ))}

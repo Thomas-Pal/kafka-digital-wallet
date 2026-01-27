@@ -1,0 +1,17 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Consent Event",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["eventId", "type", "citizenId", "grantedTo", "scopes", "ttlDays", "issuedAt"],
+  "properties": {
+    "eventId": { "type": "string" },
+    "type": { "type": "string", "enum": ["grant", "revoke", "expire"] },
+    "citizenId": { "type": "string" },
+    "grantedTo": { "type": "string" },
+    "scopes": { "type": "array", "items": { "type": "string" }, "minItems": 1 },
+    "ttlDays": { "type": "number", "minimum": 1 },
+    "issuedAt": { "type": "string", "format": "date-time" },
+    "caseId": { "type": "string" }
+  }
+}

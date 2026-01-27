@@ -17,7 +17,7 @@ import {
 import { useState } from 'react';
 import EvidenceCard from '../components/EvidenceCard';
 import { useCitizenStore } from '../state/useCitizenStore';
-import { grantConsent, requestConsent } from '../services/api';
+import { grantConsent } from '../services/api';
 
 export default function WorkBenefits() {
   const employment = useCitizenStore((state) => state.employment);
@@ -34,7 +34,6 @@ export default function WorkBenefits() {
       scopes: ['employment.termination'],
       ttlDays,
       caseId: 'uc-9001',
-      purpose: 'DWP requests access to employment termination to prefill Universal Credit claim.',
     });
     setSubmitting(false);
     setShowModal(false);
@@ -45,20 +44,6 @@ export default function WorkBenefits() {
     });
   };
 
-  const handleRequestSupport = async () => {
-    const response = await requestConsent({
-      citizenId: citizen.nhsId,
-      grantedTo: 'dwp',
-      scopes: ['employment.termination'],
-      purpose: 'DWP requests access to Employment Termination to prefill Universal Credit claim.',
-      caseId: 'uc-9001',
-    });
-    setToast({
-      open: true,
-      message: response.ok ? 'Support request sent to DWP.' : response.error || 'Unable to request support.',
-      color: response.ok ? 'success' : 'danger',
-    });
-  };
 
   return (
     <IonPage>
@@ -98,16 +83,6 @@ export default function WorkBenefits() {
                 </IonItem>
               ))}
             </IonList>
-          </IonCardContent>
-        </IonCard>
-
-        <IonCard className="gov-card">
-          <IonCardContent>
-            <h3 className="gov-heading">Request support</h3>
-            <p className="gov-subtitle">Ask DWP to begin a Universal Credit support review.</p>
-            <IonButton expand="block" fill="outline" onClick={handleRequestSupport}>
-              Request support
-            </IonButton>
           </IonCardContent>
         </IonCard>
 

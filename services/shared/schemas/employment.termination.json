@@ -1,0 +1,31 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "title": "Employment Termination",
+  "type": "object",
+  "additionalProperties": false,
+  "required": [
+    "eventId",
+    "citizenId",
+    "niNumber",
+    "employerId",
+    "employerName",
+    "terminationDate",
+    "reasonCode",
+    "weeklyHours",
+    "annualSalary",
+    "noticePaid"
+  ],
+  "properties": {
+    "eventId": { "type": "string" },
+    "citizenId": { "type": "string" },
+    "niNumber": { "type": "string" },
+    "employerId": { "type": "string" },
+    "employerName": { "type": "string" },
+    "terminationDate": { "type": "string", "format": "date-time" },
+    "reasonCode": { "type": "string" },
+    "weeklyHours": { "type": "number" },
+    "annualSalary": { "type": "number" },
+    "noticePaid": { "type": "boolean" },
+    "metadata": { "type": "object" }
+  }
+}

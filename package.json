@@ -1,9 +1,25 @@
 {
   "name": "kafka-digital-wallet",
   "private": true,
+  "workspaces": ["apps/*", "services/*"],
   "scripts": {
-    "start:services": "cd services && (npm run orchestration-api & npm run gatekeeper & npm run dwp-api)",
-    "wallet": "npm --prefix apps/wallet run dev -- --port 5173",
-    "dwp": "npm --prefix dwp-portal run dev -- --port 5174"
+    "bootstrap": "npm i -ws",
+    "up:kafka": "podman compose -f infra/compose/podman-compose.yml up -d",
+    "down:kafka": "podman compose -f infra/compose/podman-compose.yml down -v",
+    "topics": "node infra/kafka/init-topics.js",
+    "start:services": "npm-run-all -p svc:orchestrator svc:gatekeeper svc:dwp",
+    "svc:orchestrator": "NODE_ENV=dev tsx services/orchestration-api/index.ts",
+    "svc:gatekeeper": "NODE_ENV=dev tsx services/gatekeeper/index.ts",
+    "svc:dwp": "NODE_ENV=dev tsx services/dwp-api/index.ts",
+    "wallet": "npm --prefix apps/wallet run dev",
+    "portal": "npm --prefix apps/dwp-portal run dev",
+    "dev": "npm-run-all up:kafka topics start:services wallet portal",
+    "stop": "npm-run-all -s down:kafka"
+  },
+  "devDependencies": {
+    "npm-run-all": "^4.1.5",
+    "prettier": "^3.3.3",
+    "tsx": "^4.19.2",
+    "typescript": "^5.5.4"
   }
 }
