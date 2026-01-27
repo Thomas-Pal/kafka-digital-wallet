@@ -2,7 +2,7 @@ import { IonButton, IonCardContent } from '@ionic/react';
 import PageShell from '../components/PageShell';
 import Section from '../components/Section';
 import Card from '../components/Card';
-import { scenarioPublish } from '../api/client';
+import { requestConsent, scenarioPublish } from '../api/client';
 import { useWalletStore } from '../store/walletStore';
 
 export default function ScenariosLab() {
@@ -48,13 +48,25 @@ export default function ScenariosLab() {
     });
   };
 
-  const requestConsent = (rp: string, scopes: string[]) => {
-    const request = {
+  const requestConsentFromRp = async (rp: string, scopes: string[]) => {
+    let request = {
       id: crypto.randomUUID(),
       rp,
       scopes,
       citizenId: 'nhs-999',
     };
+    try {
+      const response = await requestConsent({
+        citizenId: request.citizenId,
+        rp: request.rp,
+        scopes: request.scopes,
+      });
+      if (response?.request?.id) {
+        request = response.request;
+      }
+    } catch {
+      // Orchestration may be offline in demo mode.
+    }
     pushInbox(request);
     addActivity({
       id: crypto.randomUUID(),
@@ -100,7 +112,7 @@ export default function ScenariosLab() {
               <p className="wallet-muted">DWP requests prescription access.</p>
               <IonButton
                 fill="outline"
-                onClick={() => requestConsent('dwp', ['nhs.prescriptions'])}
+                onClick={() => requestConsentFromRp('dwp', ['nhs.prescriptions'])}
               >
                 Request from DWP
               </IonButton>
@@ -109,7 +121,7 @@ export default function ScenariosLab() {
               <p className="wallet-muted">HMRC requests employment updates.</p>
               <IonButton
                 fill="outline"
-                onClick={() => requestConsent('hmrc', ['employment.termination'])}
+                onClick={() => requestConsentFromRp('hmrc', ['employment.termination'])}
               >
                 Request from HMRC
               </IonButton>
@@ -118,7 +130,7 @@ export default function ScenariosLab() {
               <p className="wallet-muted">DWP requests employment updates.</p>
               <IonButton
                 fill="outline"
-                onClick={() => requestConsent('dwp', ['employment.termination'])}
+                onClick={() => requestConsentFromRp('dwp', ['employment.termination'])}
               >
                 Request from DWP (employment)
               </IonButton>

@@ -47,6 +47,7 @@ export default function Consents() {
         grantedTo: selectedRequest.rp,
         scopes: selectedRequest.scopes,
         ttlDays: durationDays,
+        pendingId: selectedRequest.id,
       });
       if (response?.consent?.id) {
         consentId = response.consent.id;

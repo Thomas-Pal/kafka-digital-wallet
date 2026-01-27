@@ -22,17 +22,19 @@ export async function approveConsent({
   scopes,
   ttlDays,
   caseId,
+  pendingId,
 }: {
   citizenId: string;
   grantedTo: string;
   scopes: string[];
   ttlDays: number;
   caseId?: string;
+  pendingId?: string;
 }) {
   const res = await fetch(`${BASE}/consent/grant`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ citizenId, grantedTo, scopes, ttlDays, caseId }),
+    body: JSON.stringify({ citizenId, grantedTo, scopes, ttlDays, caseId, pendingId }),
   });
   return res.json();
 }
@@ -42,6 +44,23 @@ export async function revokeConsent(consentId: string) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ consentId }),
+  });
+  return res.json();
+}
+
+export async function requestConsent({
+  citizenId,
+  rp,
+  scopes,
+}: {
+  citizenId: string;
+  rp: string;
+  scopes: string[];
+}) {
+  const res = await fetch(`${BASE}/consent/request`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ citizenId, rp, scopes }),
   });
   return res.json();
 }
