@@ -14,6 +14,11 @@ export default function ScenariosLab() {
       await scenarioPublish('nhs.prescriptions', {
         citizenId: 'nhs-999',
         drug: 'Sumatriptan 50mg',
+        dosage: '50mg',
+        frequency: 'Twice daily',
+        repeat: false,
+        gpOdsCode: 'B83001',
+        condition: 'Migraine',
         prescribedAt: new Date().toISOString(),
       });
     } catch {
@@ -32,9 +37,14 @@ export default function ScenariosLab() {
     try {
       await scenarioPublish('employment.termination', {
         citizenId: 'nhs-999',
-        employer: 'Northern Logistics Ltd',
+        niNumber: 'QQ 12 34 56 C',
+        employerId: 'nl-001',
+        employerName: 'Northern Logistics Ltd',
         terminationDate: new Date().toISOString(),
-        reason: 'Redundancy',
+        reasonCode: 'REDUNDANCY',
+        weeklyHours: 37.5,
+        annualSalary: 32000,
+        noticePaid: true,
       });
     } catch {
       // Orchestration may be offline in demo mode.
