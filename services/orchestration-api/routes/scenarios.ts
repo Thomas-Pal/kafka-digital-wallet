@@ -29,10 +29,14 @@ export function createScenariosRouter({
   sendEvent,
   hasActiveConsent,
   createConsentRequest,
+  trackLatestEmployment,
+  trackLatestPrescription,
 }: {
   sendEvent: SendEvent;
   hasActiveConsent: ConsentCheck;
   createConsentRequest: ConsentRequest;
+  trackLatestEmployment: (citizenId: string, payload: Record<string, unknown>) => void;
+  trackLatestPrescription: (citizenId: string, payload: Record<string, unknown>) => void;
 }) {
   const router = Router();
 
@@ -55,6 +59,7 @@ export function createScenariosRouter({
     try {
       assertEmploymentTermination(payload);
       await sendEvent({ topic: 'employment.termination', key: citizenId, value: payload, eventId });
+      trackLatestEmployment(citizenId, payload);
     } catch (error) {
       return res
         .status(400)
@@ -123,6 +128,7 @@ export function createScenariosRouter({
     try {
       assertPrescription(payload);
       await sendEvent({ topic: 'nhs.prescriptions', key: citizenId, value: payload, eventId });
+      trackLatestPrescription(citizenId, payload);
     } catch (error) {
       return res
         .status(400)

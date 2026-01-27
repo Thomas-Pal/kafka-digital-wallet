@@ -88,6 +88,10 @@ export default function AppTabs() {
           rp: string;
           scopes: string[];
           citizenId: string;
+          purpose?: string;
+          durationDays?: number;
+          caseId?: string;
+          requestedAt?: string;
         }>;
         if (!Array.isArray(data)) {
           return;

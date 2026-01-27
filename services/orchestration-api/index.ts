@@ -50,6 +50,8 @@ type PendingConsent = {
 const pending = new Map<string, PendingConsent>();
 const active = new Map<string, ConsentRecord>();
 const audit: AuditEntry[] = [];
+const latestEmployment = new Map<string, Record<string, unknown>>();
+const latestPrescription = new Map<string, Record<string, unknown>>();
 
 const producer = createProducer();
 await producer.connect();
@@ -115,6 +117,34 @@ const createConsentRequest = ({
   };
   pending.set(requestId, request);
   return requestId;
+};
+
+const rehydrateIfNeeded = async (citizenId: string, scopes: string[]) => {
+  if (scopes.includes('employment.termination')) {
+    const payload = latestEmployment.get(citizenId);
+    if (payload) {
+      const eventId = uuid();
+      await sendEvent({
+        topic: 'employment.termination',
+        key: citizenId,
+        value: { ...payload, eventId },
+        eventId,
+      });
+    }
+  }
+
+  if (scopes.includes('nhs.prescriptions')) {
+    const payload = latestPrescription.get(citizenId);
+    if (payload) {
+      const eventId = uuid();
+      await sendEvent({
+        topic: 'nhs.prescriptions',
+        key: citizenId,
+        value: { ...payload, eventId },
+        eventId,
+      });
+    }
+  }
 };
 
 app.get('/consent/pending', (_req, res) => {
@@ -200,6 +230,7 @@ app.post('/consent/grant', async (req, res) => {
     if (pendingId) {
       pending.delete(pendingId);
     }
+    await rehydrateIfNeeded(citizenId, scopeList);
     audit.push({
       id: uuid(),
       action: 'consent.granted',
@@ -289,7 +320,13 @@ app.post('/triggers/nhs-prescription', async (req, res) => {
 app.get('/notifications/stream', sseHandler);
 app.get('/notifications', listHandler);
 
-const scenariosRouter = createScenariosRouter({ sendEvent, hasActiveConsent, createConsentRequest });
+const scenariosRouter = createScenariosRouter({
+  sendEvent,
+  hasActiveConsent,
+  createConsentRequest,
+  trackLatestEmployment: (citizenId, payload) => latestEmployment.set(citizenId, payload),
+  trackLatestPrescription: (citizenId, payload) => latestPrescription.set(citizenId, payload),
+});
 app.use('/scenarios', scenariosRouter);
 
 app.listen(4000, () => {
