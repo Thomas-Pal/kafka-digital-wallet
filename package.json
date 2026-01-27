@@ -14,9 +14,13 @@
     "wallet": "npm --prefix apps/wallet run dev",
     "portal": "npm --prefix apps/dwp-portal run dev",
     "dev": "node infra/run.mjs dev",
-    "stop": "npm run down:kafka"
+    "stop": "npm run down:kafka",
+    "kill-ports": "node -e \"['4000','5001','5002','5173','5174'].forEach((p)=>{try{require('child_process').execSync('lsof -i :'+p+' -sTCP:LISTEN -nP | awk \\\"NR>1 {print $2}\\\" | xargs kill -9 2>/dev/null || true')}catch(e){}})\"",
+    "reset:kafka": "podman pod rm -f pod_kafka-digital-wallet 2>/dev/null || true && podman rm -f kafka kafka-ui 2>/dev/null || true && podman volume prune -f",
+    "dev:fresh": "npm run kill-ports && npm run reset:kafka && npm run dev"
   },
   "devDependencies": {
+    "kafkajs": "^2.2.4",
     "prettier": "^3.3.3",
     "tsx": "^4.19.2",
     "typescript": "^5.5.4"

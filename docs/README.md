@@ -36,6 +36,14 @@ npm run wallet
 npm run portal
 ```
 
+## Troubleshooting shortcuts
+
+```bash
+npm run kill-ports
+npm run reset:kafka
+npm run dev:fresh
+```
+
 ## URLs
 
 - Wallet: http://localhost:5173

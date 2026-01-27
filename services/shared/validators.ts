@@ -1,9 +1,11 @@
 import Ajv, { ErrorObject } from 'ajv';
+import addFormats from 'ajv-formats';
 import consentSchema from './schemas/consent.events.json' assert { type: 'json' };
 import employmentSchema from './schemas/employment.termination.json' assert { type: 'json' };
 import prescriptionSchema from './schemas/nhs.prescriptions.json' assert { type: 'json' };
 
 const ajv = new Ajv({ allErrors: true, strict: false });
+addFormats(ajv);
 
 const validateConsent = ajv.compile(consentSchema);
 const validateEmployment = ajv.compile(employmentSchema);
