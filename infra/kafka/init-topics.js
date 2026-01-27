@@ -2,6 +2,13 @@ const fs = require('fs');
 const path = require('path');
 const { Kafka } = require('kafkajs');
 
+process.on('warning', (warning) => {
+  if (warning.name === 'TimeoutNegativeWarning') {
+    return;
+  }
+  console.warn(warning);
+});
+
 const brokers = (process.env.KAFKA_BROKERS || '127.0.0.1:29092').split(',');
 const clientId = process.env.KAFKA_CLIENT_ID || 'wallet-poc';
 
