@@ -17,6 +17,7 @@ const upsertTopics = async () => {
   await admin.connect();
   const topics = loadTopics();
   const existing = await admin.listTopics();
+  const resourceType = admin.resourceTypes?.TOPIC ?? 2;
 
   const toCreate = topics.filter((topic) => !existing.includes(topic.name));
   if (toCreate.length) {
@@ -28,13 +29,15 @@ const upsertTopics = async () => {
     });
   }
 
-  await admin.alterConfigs({
-    resources: topics.map((topic) => ({
-      type: admin.resourceTypes.TOPIC,
-      name: topic.name,
-      configEntries: [{ name: 'retention.ms', value: String(topic.retentionMs) }],
-    })),
-  });
+  if (typeof admin.alterConfigs === 'function') {
+    await admin.alterConfigs({
+      resources: topics.map((topic) => ({
+        type: resourceType,
+        name: topic.name,
+        configEntries: [{ name: 'retention.ms', value: String(topic.retentionMs) }],
+      })),
+    });
+  }
 
   await admin.disconnect();
 };

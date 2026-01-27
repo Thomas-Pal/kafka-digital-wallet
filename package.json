@@ -3,7 +3,7 @@
   "private": true,
   "workspaces": ["apps/*", "services/*"],
   "scripts": {
-    "bootstrap": "npm i -ws",
+    "bootstrap": "npm i --workspaces",
     "up:kafka": "podman compose -f infra/compose/podman-compose.yml up -d",
     "down:kafka": "podman compose -f infra/compose/podman-compose.yml down -v",
     "topics": "node infra/kafka/init-topics.js",
