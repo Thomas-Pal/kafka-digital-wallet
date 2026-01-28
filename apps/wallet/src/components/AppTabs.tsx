@@ -33,7 +33,6 @@ export default function AppTabs() {
   const pushInbox = useWalletStore((state) => state.pushInbox);
   const citizenId = useWalletStore((state) => state.citizen.id);
   const addActivity = useWalletStore((state) => state.addActivity);
-  const [toastMessage, setToastMessage] = useState('');
   const [notificationToast, setNotificationToast] = useState<{
     title: string;
     message: string;
@@ -99,9 +98,6 @@ export default function AppTabs() {
         const fresh = data.filter((item) => !knownIds.current.has(item.id));
         if (fresh.length > 0) {
           fresh.forEach((item) => pushInbox(item));
-          setToastMessage(
-            `${fresh.length} new consent request${fresh.length === 1 ? '' : 's'}`
-          );
         }
       } catch {
         // Silent: orchestration service may be offline in demo mode.
@@ -158,14 +154,6 @@ export default function AppTabs() {
         </IonTabButton>
       </IonTabBar>
 
-      <IonToast
-        isOpen={Boolean(toastMessage)}
-        message={toastMessage}
-        duration={2000}
-        onDidDismiss={() => setToastMessage('')}
-        position="top"
-        color="primary"
-      />
       <IonToast
         isOpen={Boolean(notificationToast)}
         header={notificationToast?.title}
