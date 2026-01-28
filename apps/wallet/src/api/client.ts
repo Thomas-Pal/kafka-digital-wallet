@@ -17,6 +17,19 @@ export async function fetchConsentInbox() {
   }
 }
 
+export async function fetchActiveConsents() {
+  try {
+    const res = await fetch(`${BASE}/consent/active`);
+    if (!res.ok) {
+      return { data: [], ok: false, status: res.status };
+    }
+    const data = await res.json().catch(() => []);
+    return { data, ok: true, status: res.status };
+  } catch {
+    return { data: [], ok: false, status: 0 };
+  }
+}
+
 export async function approveConsent({
   citizenId,
   grantedTo,

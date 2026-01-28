@@ -23,7 +23,7 @@ import Credentials from '../pages/Credentials';
 import Consents from '../pages/Consents';
 import Activity from '../pages/Activity';
 import ScenariosLab from '../pages/ScenariosLab';
-import { fetchConsentInbox } from '../api/client';
+import { fetchActiveConsents, fetchConsentInbox } from '../api/client';
 import { useWalletStore } from '../store/walletStore';
 import { startNotifications } from '../lib/notifications';
 
@@ -31,6 +31,7 @@ export default function AppTabs() {
   const navigate = useNavigate();
   const inbox = useWalletStore((state) => state.inbox);
   const pushInbox = useWalletStore((state) => state.pushInbox);
+  const setConsents = useWalletStore((state) => state.setConsents);
   const citizenId = useWalletStore((state) => state.citizen.id);
   const addActivity = useWalletStore((state) => state.addActivity);
   const [notificationToast, setNotificationToast] = useState<{
@@ -104,14 +105,64 @@ export default function AppTabs() {
       }
     };
 
+    const pollActive = async () => {
+      try {
+        const response = await fetchActiveConsents();
+        if (!mounted) {
+          return;
+        }
+        if (!response.ok) {
+          if (response.status === 404) {
+            window.clearInterval(interval);
+          }
+          return;
+        }
+        const data = response.data as Array<{
+          id: string;
+          citizenId: string;
+          grantedTo: string;
+          scopes: string[];
+          ttlDays: number;
+          issuedAt: string;
+          expiresAt: string;
+          caseId?: string;
+        }>;
+        if (!Array.isArray(data)) {
+          return;
+        }
+        setConsents((current) => {
+          const byId = new Map(current.map((consent) => [consent.id, consent]));
+          for (const consent of data) {
+            byId.set(consent.id, {
+              id: consent.id,
+              citizenId: consent.citizenId,
+              rp: consent.grantedTo,
+              scopes: consent.scopes,
+              status: 'granted',
+              issuedAt: consent.issuedAt,
+              expiresAt: consent.expiresAt,
+              caseId: consent.caseId,
+            });
+          }
+          return Array.from(byId.values());
+        });
+      } catch {
+        // Silent: orchestration service may be offline in demo mode.
+      }
+    };
+
     let interval = 0;
-    interval = window.setInterval(pollInbox, 4000);
+    interval = window.setInterval(() => {
+      pollInbox();
+      pollActive();
+    }, 4000);
     pollInbox();
+    pollActive();
     return () => {
       mounted = false;
       window.clearInterval(interval);
     };
-  }, [pushInbox]);
+  }, [pushInbox, setConsents]);
 
   return (
     <IonTabs>
