@@ -8,7 +8,7 @@ import {
   IonTabs,
   IonToast,
 } from '@ionic/react';
-import { Navigate, Route, Routes } from 'react-router-dom';
+import { Navigate, Route, Routes, useNavigate } from 'react-router-dom';
 import {
   albumsOutline,
   flaskOutline,
@@ -23,18 +23,50 @@ import Credentials from '../pages/Credentials';
 import Consents from '../pages/Consents';
 import Activity from '../pages/Activity';
 import ScenariosLab from '../pages/ScenariosLab';
-import { fetchConsentInbox } from '../api/client';
+import { fetchActiveConsents, fetchConsentInbox } from '../api/client';
 import { useWalletStore } from '../store/walletStore';
+import { startNotifications } from '../lib/notifications';
 
 export default function AppTabs() {
+  const navigate = useNavigate();
   const inbox = useWalletStore((state) => state.inbox);
   const pushInbox = useWalletStore((state) => state.pushInbox);
-  const [toastMessage, setToastMessage] = useState('');
+  const setConsents = useWalletStore((state) => state.setConsents);
+  const citizenId = useWalletStore((state) => state.citizen.id);
+  const addActivity = useWalletStore((state) => state.addActivity);
+  const [notificationToast, setNotificationToast] = useState<{
+    title: string;
+    message: string;
+    action?: { label: string; href: string };
+  } | null>(null);
   const knownIds = useRef(new Set(inbox.map((item) => item.id)));
+  const knownNotifications = useRef(new Set<string>());
 
   useEffect(() => {
     knownIds.current = new Set(inbox.map((item) => item.id));
   }, [inbox]);
+
+  useEffect(() => {
+    const stop = startNotifications(citizenId, (notification) => {
+      if (knownNotifications.current.has(notification.id)) {
+        return;
+      }
+      knownNotifications.current.add(notification.id);
+      setNotificationToast({
+        title: notification.title,
+        message: notification.body,
+        action: notification.action,
+      });
+      addActivity({
+        id: notification.id,
+        ts: notification.createdAt,
+        kind: 'request',
+        summary: notification.title,
+        details: notification.body,
+      });
+    });
+    return () => stop();
+  }, [addActivity, citizenId]);
 
   useEffect(() => {
     let mounted = true;
@@ -56,6 +88,10 @@ export default function AppTabs() {
           rp: string;
           scopes: string[];
           citizenId: string;
+          purpose?: string;
+          durationDays?: number;
+          caseId?: string;
+          requestedAt?: string;
         }>;
         if (!Array.isArray(data)) {
           return;
@@ -63,23 +99,70 @@ export default function AppTabs() {
         const fresh = data.filter((item) => !knownIds.current.has(item.id));
         if (fresh.length > 0) {
           fresh.forEach((item) => pushInbox(item));
-          setToastMessage(
-            `${fresh.length} new consent request${fresh.length === 1 ? '' : 's'}`
-          );
         }
       } catch {
         // Silent: orchestration service may be offline in demo mode.
       }
     };
 
+    const pollActive = async () => {
+      try {
+        const response = await fetchActiveConsents();
+        if (!mounted) {
+          return;
+        }
+        if (!response.ok) {
+          if (response.status === 404) {
+            window.clearInterval(interval);
+          }
+          return;
+        }
+        const data = response.data as Array<{
+          id: string;
+          citizenId: string;
+          grantedTo: string;
+          scopes: string[];
+          ttlDays: number;
+          issuedAt: string;
+          expiresAt: string;
+          caseId?: string;
+        }>;
+        if (!Array.isArray(data)) {
+          return;
+        }
+        setConsents((current) => {
+          const byId = new Map(current.map((consent) => [consent.id, consent]));
+          for (const consent of data) {
+            byId.set(consent.id, {
+              id: consent.id,
+              citizenId: consent.citizenId,
+              rp: consent.grantedTo,
+              scopes: consent.scopes,
+              status: 'granted',
+              issuedAt: consent.issuedAt,
+              expiresAt: consent.expiresAt,
+              caseId: consent.caseId,
+            });
+          }
+          return Array.from(byId.values());
+        });
+      } catch {
+        // Silent: orchestration service may be offline in demo mode.
+      }
+    };
+
     let interval = 0;
-    interval = window.setInterval(pollInbox, 4000);
+    interval = window.setInterval(() => {
+      pollInbox();
+      pollActive();
+    }, 4000);
     pollInbox();
+    pollActive();
     return () => {
       mounted = false;
       window.clearInterval(interval);
     };
-  }, [pushInbox]);
+  }, [pushInbox, setConsents]);
 
   return (
     <IonTabs>
@@ -123,12 +206,26 @@ export default function AppTabs() {
       </IonTabBar>
 
       <IonToast
-        isOpen={Boolean(toastMessage)}
-        message={toastMessage}
-        duration={2000}
-        onDidDismiss={() => setToastMessage('')}
+        isOpen={Boolean(notificationToast)}
+        header={notificationToast?.title}
+        message={notificationToast?.message}
+        duration={6000}
+        onDidDismiss={() => setNotificationToast(null)}
         position="top"
-        color="primary"
+        color="tertiary"
+        buttons={
+          notificationToast?.action
+            ? [
+                {
+                  text: notificationToast.action.label,
+                  handler: () => {
+                    navigate(notificationToast.action?.href ?? '/consents');
+                    setNotificationToast(null);
+                  },
+                },
+              ]
+            : undefined
+        }
       />
     </IonTabs>
   );

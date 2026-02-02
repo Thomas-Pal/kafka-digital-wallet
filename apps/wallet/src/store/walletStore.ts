@@ -16,7 +16,13 @@ export type Consent = {
   status: 'granted' | 'revoked' | 'expired' | 'pending';
   issuedAt: string;
   expiresAt?: string;
+  purpose?: string;
+  durationDays?: number;
+  caseId?: string;
+  requestedAt?: string;
 };
+
+export type ConsentRequest = Omit<Consent, 'status' | 'issuedAt' | 'expiresAt'>;
 
 export type ActivityItem = {
   id: string;
@@ -40,12 +46,12 @@ type WalletState = {
   };
   credentials: Credential[];
   consents: Consent[];
-  inbox: Array<Omit<Consent, 'status' | 'issuedAt' | 'expiresAt'>>;
+  inbox: ConsentRequest[];
   activity: ActivityItem[];
 
   setConsents: (f: (c: Consent[]) => Consent[]) => void;
   addActivity: (a: ActivityItem) => void;
-  pushInbox: (req: Omit<Consent, 'status' | 'issuedAt' | 'expiresAt'>) => void;
+  pushInbox: (req: ConsentRequest) => void;
   clearInbox: () => void;
   removeInbox: (id: string) => void;
 };

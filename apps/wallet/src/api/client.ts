@@ -1,4 +1,5 @@
 const BASE =
+  import.meta.env.VITE_ORCH_BASE_URL ??
   import.meta.env.VITE_ORCH_URL ??
   import.meta.env.VITE_ORCH_API ??
   'http://localhost:4000';
@@ -6,6 +7,19 @@ const BASE =
 export async function fetchConsentInbox() {
   try {
     const res = await fetch(`${BASE}/consent/pending`);
+    if (!res.ok) {
+      return { data: [], ok: false, status: res.status };
+    }
+    const data = await res.json().catch(() => []);
+    return { data, ok: true, status: res.status };
+  } catch {
+    return { data: [], ok: false, status: 0 };
+  }
+}
+
+export async function fetchActiveConsents() {
+  try {
+    const res = await fetch(`${BASE}/consent/active`);
     if (!res.ok) {
       return { data: [], ok: false, status: res.status };
     }
@@ -71,8 +85,8 @@ export async function scenarioPublish(
 ) {
   const endpoint =
     kind === 'nhs.prescriptions'
-      ? `${BASE}/triggers/nhs-prescription`
-      : `${BASE}/triggers/employment-termination`;
+      ? `${BASE}/scenarios/prescription-issued`
+      : `${BASE}/scenarios/employment-termination`;
   const res = await fetch(endpoint, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },

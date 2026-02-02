@@ -3,6 +3,8 @@ import { v4 as uuid } from 'uuid';
 import { allowAll } from '../shared/utils/cors.js';
 import { createProducer } from '../shared/kafka/client.js';
 import { assertConsentEvent, assertEmploymentTermination, assertPrescription } from '../shared/validators.js';
+import { listHandler, sseHandler } from './notifications.js';
+import { createScenariosRouter } from './routes/scenarios.js';
 
 const app = express();
 app.use(express.json());
@@ -40,11 +42,16 @@ type PendingConsent = {
   rp: string;
   scopes: string[];
   requestedAt: string;
+  purpose?: string;
+  durationDays?: number;
+  caseId?: string;
 };
 
 const pending = new Map<string, PendingConsent>();
 const active = new Map<string, ConsentRecord>();
 const audit: AuditEntry[] = [];
+const latestEmployment = new Map<string, Record<string, unknown>>();
+const latestPrescription = new Map<string, Record<string, unknown>>();
 
 const producer = createProducer();
 await producer.connect();
@@ -64,6 +71,82 @@ const sendEvent = async ({ topic, key, value, eventId }: { topic: string; key: s
 
 app.get('/healthz', (_req, res) => res.json({ ok: true }));
 
+const hasActiveConsent = ({
+  citizenId,
+  grantedTo,
+  scopes,
+}: {
+  citizenId: string;
+  grantedTo: string;
+  scopes: string[];
+}) => {
+  const now = Date.now();
+  return Array.from(active.values()).some((consent) => {
+    if (consent.citizenId !== citizenId) return false;
+    if (consent.grantedTo !== grantedTo) return false;
+    if (consent.expiresAt && new Date(consent.expiresAt).getTime() < now) return false;
+    return scopes.every((scope) => consent.scopes.includes(scope));
+  });
+};
+
+const createConsentRequest = ({
+  citizenId,
+  rp,
+  scopes,
+  purpose,
+  durationDays,
+  caseId,
+}: {
+  citizenId: string;
+  rp: string;
+  scopes: string[];
+  purpose?: string;
+  durationDays?: number;
+  caseId?: string;
+}) => {
+  const requestId = uuid();
+  const request: PendingConsent = {
+    id: requestId,
+    citizenId,
+    rp,
+    scopes,
+    purpose,
+    durationDays,
+    caseId,
+    requestedAt: new Date().toISOString(),
+  };
+  pending.set(requestId, request);
+  return requestId;
+};
+
+const rehydrateIfNeeded = async (citizenId: string, scopes: string[]) => {
+  if (scopes.includes('employment.termination')) {
+    const payload = latestEmployment.get(citizenId);
+    if (payload) {
+      const eventId = uuid();
+      await sendEvent({
+        topic: 'employment.termination',
+        key: citizenId,
+        value: { ...payload, eventId },
+        eventId,
+      });
+    }
+  }
+
+  if (scopes.includes('nhs.prescriptions')) {
+    const payload = latestPrescription.get(citizenId);
+    if (payload) {
+      const eventId = uuid();
+      await sendEvent({
+        topic: 'nhs.prescriptions',
+        key: citizenId,
+        value: { ...payload, eventId },
+        eventId,
+      });
+    }
+  }
+};
+
 app.get('/consent/pending', (_req, res) => {
   res.json(Array.from(pending.values()));
 });
@@ -77,22 +160,22 @@ app.get('/consent/audit', (_req, res) => {
 });
 
 app.post('/consent/request', (req, res) => {
-  const { citizenId, rp, grantedTo, scopes } = req.body || {};
+  const { citizenId, rp, grantedTo, scopes, purpose, durationDays, caseId } = req.body || {};
   const scopeList = Array.isArray(scopes) ? scopes : scopes ? [scopes] : [];
   const relyingParty = rp || grantedTo;
   if (!citizenId || !relyingParty || scopeList.length === 0) {
     return res.status(400).json({ ok: false, error: 'citizenId, rp, and scopes required' });
   }
 
-  const requestId = uuid();
-  const request: PendingConsent = {
-    id: requestId,
+  const requestId = createConsentRequest({
     citizenId,
     rp: relyingParty,
     scopes: scopeList,
-    requestedAt: new Date().toISOString(),
-  };
-  pending.set(requestId, request);
+    purpose,
+    durationDays,
+    caseId,
+  });
+  const request = pending.get(requestId);
   return res.json({ ok: true, request });
 });
 
@@ -147,6 +230,7 @@ app.post('/consent/grant', async (req, res) => {
     if (pendingId) {
       pending.delete(pendingId);
     }
+    await rehydrateIfNeeded(citizenId, scopeList);
     audit.push({
       id: uuid(),
       action: 'consent.granted',
@@ -232,6 +316,18 @@ app.post('/triggers/nhs-prescription', async (req, res) => {
     return res.status(400).json({ ok: false, error: error instanceof Error ? error.message : 'invalid payload' });
   }
 });
+
+app.get('/notifications/stream', sseHandler);
+app.get('/notifications', listHandler);
+
+const scenariosRouter = createScenariosRouter({
+  sendEvent,
+  hasActiveConsent,
+  createConsentRequest,
+  trackLatestEmployment: (citizenId, payload) => latestEmployment.set(citizenId, payload),
+  trackLatestPrescription: (citizenId, payload) => latestPrescription.set(citizenId, payload),
+});
+app.use('/scenarios', scenariosRouter);
 
 app.listen(4000, () => {
   debug('Orchestration API listening on :4000');

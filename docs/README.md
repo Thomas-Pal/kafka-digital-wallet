@@ -1,6 +1,6 @@
 # Kafka Digital Wallet (Monorepo)
 
-This repo is a local, consent-driven demo of a digital wallet where Kafka is the backbone. The citizen wallet grants consent and triggers RAW events; the gatekeeper emits permitted VIEW topics; the DWP portal shows cases only when consent and evidence align.
+This repo is a local, consent-driven demo of a digital wallet where Kafka is the backbone. The citizen wallet grants consent and triggers RAW events; the gatekeeper emits permitted VIEW topics; the DWP portal shows cases only when consent and evidence align. The architecture docs include forward-ready plans for coach-facing services and additional VIEW topics.
 
 ## Quick start (3 commands)
 

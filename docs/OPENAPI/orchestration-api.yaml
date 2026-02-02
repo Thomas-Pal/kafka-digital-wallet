@@ -1,0 +1,141 @@
+openapi: 3.0.3
+info:
+  title: Orchestration API
+  version: 0.3.0
+servers:
+  - url: https://{host}
+    variables:
+      host:
+        default: localhost:4000
+paths:
+  /consents/requests:
+    post:
+      summary: Create consent request (RP -> citizen)
+      requestBody:
+        $ref: '#/components/requestBodies/ConsentRequest'
+      responses:
+        '201':
+          $ref: '#/components/responses/Created'
+  /consents/grants:
+    post:
+      summary: Citizen grants consent
+      requestBody:
+        $ref: '#/components/requestBodies/ConsentGrant'
+      responses:
+        '201':
+          $ref: '#/components/responses/Created'
+  /consents/{citizenId}:
+    get:
+      summary: List active consents for citizen
+      parameters:
+        - in: path
+          name: citizenId
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          $ref: '#/components/responses/ConsentList'
+components:
+  requestBodies:
+    ConsentRequest:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ConsentRequest'
+    ConsentGrant:
+      required: true
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ConsentGrant'
+  responses:
+    Created:
+      description: Created
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/CreatedResponse'
+    ConsentList:
+      description: Active consent list
+      content:
+        application/json:
+          schema:
+            type: array
+            items:
+              $ref: '#/components/schemas/ConsentRecord'
+  schemas:
+    ConsentRequest:
+      type: object
+      required: [citizenId, rp, scopes]
+      properties:
+        citizenId:
+          type: string
+        rp:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+        purpose:
+          type: string
+        durationDays:
+          type: integer
+        caseId:
+          type: string
+    ConsentGrant:
+      type: object
+      required: [citizenId, grantedTo, scopes, ttlDays]
+      properties:
+        citizenId:
+          type: string
+        grantedTo:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+        ttlDays:
+          type: integer
+        caseId:
+          type: string
+        timeWindow:
+          type: object
+          properties:
+            from:
+              type: string
+              format: date-time
+            to:
+              type: string
+              format: date-time
+    ConsentRecord:
+      type: object
+      properties:
+        id:
+          type: string
+        citizenId:
+          type: string
+        grantedTo:
+          type: string
+        scopes:
+          type: array
+          items:
+            type: string
+        ttlDays:
+          type: integer
+        issuedAt:
+          type: string
+          format: date-time
+        expiresAt:
+          type: string
+          format: date-time
+        caseId:
+          type: string
+    CreatedResponse:
+      type: object
+      properties:
+        ok:
+          type: boolean
+        id:
+          type: string
